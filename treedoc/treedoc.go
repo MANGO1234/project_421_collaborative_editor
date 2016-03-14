@@ -24,7 +24,24 @@ type Dir struct {
 // The path to an atom in Treedoc
 type PosId []Dir
 
+// ==========================================================
+// The treedoc structure:
+//              ___________________
+//             | DisambiguatorNode |
+//             | O   O  ...      O |
+//             |___________________|
+//               |   |           |
+//        _______|   |_______    |_______
+//       |DocNode|   |DocNode|...|DocNode|   <- DocNodes
+//       |_L___R_|   |_L___R_|   |_L___R_|
+//         |   |       |   |  ...  |   |
+//      (ooo) (ooo) (ooo) (ooo) (ooo) (ooo)  <- DisambiguatorNodes 
+//      /|  ...                          |\      
+// 
+// ===========================================================
+
 // This is used to deal with concurrent edit to the same location
+// Can be the root of a treedoc
 type DisambiguatorNode struct {
 	Nodes []*DocNode
 }
