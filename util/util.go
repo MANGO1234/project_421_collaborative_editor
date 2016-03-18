@@ -115,6 +115,7 @@ func (writer *MessageWriter) WriteMessage(str string) error {
 	return err
 }
 
+
 func (writer *MessageWriter) WriteMessageSlice(str []byte) error {
 	n := len(str)
 	_, err := writer.Writer.WriteString(strconv.Itoa(n))
@@ -138,4 +139,37 @@ func (writer *MessageWriter) WriteMessageSlice(str []byte) error {
 		return err
 	}
 	return err
+}
+
+// write a message type to a writer, followed by str as message content
+func (writer *MessageWriter) WriteMessage2(msgType string, str string) error {
+	// write message type
+	_, err := writer.Writer.WriteString(msgType)
+	if err != nil {
+		return err
+	}
+	err = writer.Writer.WriteByte(' ')
+	if err != nil {
+		return err
+	}
+
+	// write str
+	err = writer.WriteMessage(str)
+	return err
+}
+
+// read a message, return msgType as string and message content as []byte.
+func (reader *MessageReader) ReadMessage2() (string , []byte , error) {
+	msgType, err := reader.Reader.ReadString(' ')
+	if err != nil {
+		return "", nil, err
+	}
+
+	buff, err := reader.ReadMessageSlice()
+	if err != nil {
+		return msgType, nil, err
+	} else {
+		return msgType, buff, err
+	}
+
 }

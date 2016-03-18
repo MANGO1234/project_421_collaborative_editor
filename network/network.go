@@ -11,6 +11,7 @@ import (
 	"../util"
 	"github.com/satori/go.uuid"
 	"net"
+	"encoding/json"
 )
 
 // data structures
@@ -21,8 +22,13 @@ type Node struct {
 
 	// fields below are for local communication purpose
 	connected bool         // true if current node is connected to target node
-	in        *net.TCPConn // tcpConn for listening from that node
-	out       *net.TCPConn // tcpConn for writing to that node
+	in        *ConnWrapper
+	out       *ConnWrapper 
+}
+
+type ConnWrapper struct {
+	ConnReader *util.MessageReader
+	ConnWriter *util.MessageWriter
 }
 
 type NodeMetaData struct {
@@ -38,6 +44,11 @@ type NodeMap struct {
 // global variables
 var nodeMetaData NodeMetaData                       // keeps track of current node's information
 var nodeMap = NodeMap{Nodes: make(map[string]Node)} // keeps track of all nodes in the system
+
+// message type
+var RegMsg string = "registration"
+
+
 
 // listen for incoming connection
 func listenForConn(listener *TCPListener) {
@@ -71,7 +82,7 @@ func Initialize(addr string) error {
 
 	if err == nil {
 		newUUID := uuid.NewV1().String()
-		nodeMataData = NodeMetaData{newUUID, lAddr}
+		nodeMetaData = NodeMetaData{newUUID, lAddr}
 		go listenForConn(listener)
 	}
 
@@ -81,8 +92,15 @@ func Initialize(addr string) error {
 // All the following functions assume an Initialize call has been made
 
 func ConnectTo(remoteAddr string) error {
-	// TODO
-	return nil
+	conn, err := net.Dial("tcp", remoteAddr)
+	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
+
+	msg, _ := json.Marshall(nodeMetaData)
+	msgWriter.WriteMessage2(RegMsg, msg)
+
+	
+
+	return err
 }
 
 func Broadcast() {
