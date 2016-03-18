@@ -142,7 +142,7 @@ func (writer *MessageWriter) WriteMessageSlice(str []byte) error {
 }
 
 // write a message type to a writer, followed by str as message content
-func (writer *MessageWriter) WriteMessage2(msgType string, str string) error {
+func (writer *MessageWriter) WriteMessage2(msgType string, msg []byte) error {
 	// write message type
 	_, err := writer.Writer.WriteString(msgType)
 	if err != nil {
@@ -154,7 +154,7 @@ func (writer *MessageWriter) WriteMessage2(msgType string, str string) error {
 	}
 
 	// write str
-	err = writer.WriteMessage(str)
+	err = writer.WriteMessageSlice(msg)
 	return err
 }
 

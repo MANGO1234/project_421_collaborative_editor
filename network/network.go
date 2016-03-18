@@ -12,6 +12,7 @@ import (
 	"github.com/satori/go.uuid"
 	"net"
 	"encoding/json"
+	"bufio"
 )
 
 // data structures
@@ -98,7 +99,7 @@ func ConnectTo(remoteAddr string) error {
 	msg, _ := json.Marshall(nodeMetaData)
 	msgWriter.WriteMessage2(RegMsg, msg)
 
-	
+
 
 	return err
 }
