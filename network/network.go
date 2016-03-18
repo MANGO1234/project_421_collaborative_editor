@@ -11,6 +11,9 @@ import (
 	"../util"
 	"github.com/satori/go.uuid"
 	"net"
+	"bufio"
+	"fmt"
+	"sync"
 	"encoding/json"
 	"bufio"
 )
@@ -52,7 +55,7 @@ var RegMsg string = "registration"
 
 
 // listen for incoming connection
-func listenForConn(listener *TCPListener) {
+func listenForConn(listener *net.TCPListener) {
 	for {
 		conn, _ := listener.Accept()
 		handleConn(conn)
@@ -83,7 +86,7 @@ func Initialize(addr string) error {
 
 	if err == nil {
 		newUUID := uuid.NewV1().String()
-		nodeMetaData = NodeMetaData{newUUID, lAddr}
+		nodeMetaData = NodeMetaData{newUUID, lAddr.String()}
 		go listenForConn(listener)
 	}
 
@@ -96,7 +99,7 @@ func ConnectTo(remoteAddr string) error {
 	conn, err := net.Dial("tcp", remoteAddr)
 	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
 
-	msg, _ := json.Marshall(nodeMetaData)
+	msg, _ := json.Marshal(nodeMetaData)
 	msgWriter.WriteMessage2(RegMsg, msg)
 
 
