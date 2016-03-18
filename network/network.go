@@ -9,13 +9,12 @@ package network
 
 import (
 	"../util"
+	"bufio"
 	"github.com/satori/go.uuid"
 	"net"
-	"bufio"
-	"fmt"
-	"sync"
+	//	"fmt"
 	"encoding/json"
-	"bufio"
+	"sync"
 )
 
 // data structures
@@ -25,9 +24,9 @@ type Node struct {
 	Quitted bool // node is forever quitted if it voluntarily leave the network
 
 	// fields below are for local communication purpose
-	connected bool         // true if current node is connected to target node
+	connected bool // true if current node is connected to target node
 	in        *ConnWrapper
-	out       *ConnWrapper 
+	out       *ConnWrapper
 }
 
 type ConnWrapper struct {
@@ -51,8 +50,6 @@ var nodeMap = NodeMap{Nodes: make(map[string]Node)} // keeps track of all nodes 
 
 // message type
 var RegMsg string = "registration"
-
-
 
 // listen for incoming connection
 func listenForConn(listener *net.TCPListener) {
@@ -101,8 +98,6 @@ func ConnectTo(remoteAddr string) error {
 
 	msg, _ := json.Marshal(nodeMetaData)
 	msgWriter.WriteMessage2(RegMsg, msg)
-
-
 
 	return err
 }

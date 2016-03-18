@@ -1,4 +1,4 @@
-// This is a primitive try to handle network connections according to 
+// This is a primitive try to handle network connections according to
 // the proposal. If it works well, we can replace editor.go with this.
 //
 // Usage: go run node.go [ip:port]
