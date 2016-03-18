@@ -3,7 +3,6 @@ package treedoc2
 import (
 	"bytes"
 	"fmt"
-	"math"
 )
 
 type NodeId [20]byte
@@ -17,7 +16,6 @@ type DocNode struct {
 	Parent *DocNode
 	NodeId NodeId
 	Atoms  []Atom
-	Right  []*DocNode
 }
 
 const UNINITIATED byte = 0
@@ -109,16 +107,12 @@ func InsertNew(doc *Document, operation Operation) {
 	newNode.Atoms = insertAtom(newNode.Atoms, Atom{Atom: operation.Atom, State: ALIVE}, operation.N)
 	doc.Nodes[operation.Id] = newNode
 
-	if operation.ParentN == math.MaxUint16 {
-		parent.Right = insertNode(parent.Right, newNode)
-	} else {
-		parent.Atoms = extendAtoms(parent.Atoms, operation.ParentN)
-		atom := parent.Atoms[operation.ParentN]
-		parent.Atoms[operation.ParentN] = Atom{
-			State: atom.State,
-			Atom:  atom.Atom,
-			Left:  insertNode(atom.Left, newNode),
-		}
+	parent.Atoms = extendAtoms(parent.Atoms, operation.ParentN)
+	atom := parent.Atoms[operation.ParentN]
+	parent.Atoms[operation.ParentN] = Atom{
+		State: atom.State,
+		Atom:  atom.Atom,
+		Left:  insertNode(atom.Left, newNode),
 	}
 }
 
@@ -164,19 +158,18 @@ func docToBufferHelper(disambiguator []*DocNode, buf *bytes.Buffer) *bytes.Buffe
 				buf.WriteByte(atom.Atom)
 			}
 		}
-		buf = docToBufferHelper(node.Right, buf)
 	}
 	return buf
 }
 
 func DebugDoc(doc *Document) {
-	DebugDocHelper(doc.Doc, "")
+	debugDocHelper(doc.Doc, "")
 }
 
-func DebugDocHelper(disambiguator []*DocNode, indent string) {
+func debugDocHelper(disambiguator []*DocNode, indent string) {
 	for _, node := range disambiguator {
 		for _, atom := range node.Atoms {
-			DebugDocHelper(atom.Left, indent+"  ")
+			debugDocHelper(atom.Left, indent+"  ")
 			if atom.State == ALIVE {
 				fmt.Print(indent)
 				fmt.Print("  ")
@@ -191,6 +184,44 @@ func DebugDocHelper(disambiguator []*DocNode, indent string) {
 				fmt.Printf("%s\n", node.NodeId)
 			}
 		}
-		DebugDocHelper(node.Right, indent+"  ")
 	}
+}
+
+func DocHeight(doc *Document) int {
+	return docHeightHelper(doc.Doc)
+}
+
+func docHeightHelper(disambiguator []*DocNode) int {
+	max := -1
+	for _, node := range disambiguator {
+		for _, atom := range node.Atoms {
+			a := docHeightHelper(atom.Left) + 1
+			if a > max {
+				max = a
+			}
+		}
+	}
+	return max
+}
+
+func DocStat(doc *Document) (int, int) {
+	return docStat(doc.Doc)
+}
+
+func docStat(disambiguator []*DocNode) (int, int) {
+	alive := 0
+	dead := 0
+	for _, node := range disambiguator {
+		for _, atom := range node.Atoms {
+			a, d := docStat(atom.Left)
+			alive += a
+			dead += d
+			if atom.State == ALIVE {
+				alive++
+			} else if atom.State == DEAD {
+				dead++
+			}
+		}
+	}
+	return alive, dead
 }
