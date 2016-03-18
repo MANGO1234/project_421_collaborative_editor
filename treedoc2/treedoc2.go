@@ -53,17 +53,18 @@ func insertNode(disambiguator []*DocNode, node *DocNode) []*DocNode {
 		return a
 	}
 
-	var i = 0
-	for i = len(disambiguator); i >= 1; i-- {
+	var a = 0
+	for i := len(disambiguator); i >= 1; i-- {
 		docNode := disambiguator[i-1]
 		if bytes.Compare(node.NodeId[:], docNode.NodeId[:]) > 0 {
+			a = i
 			break
 		}
 	}
 
 	disambiguator = append(disambiguator, node)
-	copy(disambiguator[i:], disambiguator[i+1:])
-	disambiguator[i] = node
+	copy(disambiguator[a+1:], disambiguator[a:])
+	disambiguator[a] = node
 	return disambiguator
 }
 
