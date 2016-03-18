@@ -6,24 +6,21 @@ import (
 	"math"
 )
 
-type SiteId struct {
-	Id [16]byte
-	N  uint16
-}
+type NodeId [20]byte
 
 type Document struct {
 	Doc   []*DocNode
-	Nodes map[SiteId]*DocNode
+	Nodes map[NodeId]*DocNode
 }
 
 type DocNode struct {
 	Parent *DocNode
-	SiteId SiteId
+	NodeId NodeId
 	Atoms  []Atom
 	Right  []*DocNode
 }
 
-const UNKNOWN byte = 0
+const UNINITIATED byte = 0
 const DEAD byte = 1
 const ALIVE byte = 2
 
@@ -34,18 +31,21 @@ type Atom struct {
 }
 
 const INSERT_NEW byte = 0
-const INSERT byte = 1
-const DELETE byte = 2
+const INSERT_ROOT byte = 1
+const INSERT byte = 2
+const DELETE byte = 3
 
 type Operation struct {
 	Type     byte
-	ParentId SiteId
-	Id       SiteId
+	ParentId NodeId
+	ParentN  uint16
+	Id       NodeId
+	N        uint16
 	Atom     byte
 }
 
 func NewDocument() *Document {
-	return &Document{make([]*DocNode, 0, 4), make(map[SiteId]*DocNode)}
+	return &Document{make([]*DocNode, 0, 4), make(map[NodeId]*DocNode)}
 }
 
 func insertNode(disambiguator []*DocNode, node *DocNode) []*DocNode {
@@ -58,8 +58,7 @@ func insertNode(disambiguator []*DocNode, node *DocNode) []*DocNode {
 	var i = 0
 	for i = len(disambiguator); i >= 1; i-- {
 		docNode := disambiguator[i-1]
-		result := bytes.Compare(node.SiteId.Id[:], docNode.SiteId.Id[:])
-		if result > 0 {
+		if bytes.Compare(node.NodeId[:], docNode.NodeId[:]) > 0 {
 			break
 		}
 	}
@@ -71,6 +70,10 @@ func insertNode(disambiguator []*DocNode, node *DocNode) []*DocNode {
 }
 
 func extendAtoms(atoms []Atom, i uint16) []Atom {
+	if atoms == nil {
+		return make([]Atom, i+1, i+5)
+	}
+
 	n := len(atoms)
 	for int(i) >= n {
 		atoms = append(atoms, Atom{})
@@ -89,9 +92,11 @@ func ApplyOperation(doc *Document, operation Operation) {
 	if operation.Type == INSERT_NEW {
 		InsertNew(doc, operation)
 	} else if operation.Type == INSERT {
-		InsertN(doc, operation)
+		Insert(doc, operation)
 	} else if operation.Type == DELETE {
-		DeleteN(doc, operation)
+		Delete(doc, operation)
+	} else if operation.Type == INSERT_ROOT {
+		InsertRoot(doc, operation)
 	}
 }
 
@@ -99,17 +104,17 @@ func InsertNew(doc *Document, operation Operation) {
 	parent := doc.Nodes[operation.ParentId]
 	newNode := &DocNode{
 		Parent: parent,
-		SiteId: operation.Id,
-		Atoms:  make([]Atom, 0, 4),
+		NodeId: operation.Id,
 	}
-	insertAtom(newNode.Atoms, Atom{Atom: operation.Atom, State: ALIVE}, operation.Id.N)
+	newNode.Atoms = insertAtom(newNode.Atoms, Atom{Atom: operation.Atom, State: ALIVE}, operation.N)
+	doc.Nodes[operation.Id] = newNode
 
-	if operation.ParentId.N == math.MaxUint16 {
+	if operation.ParentN == math.MaxUint16 {
 		parent.Right = insertNode(parent.Right, newNode)
 	} else {
-		extendAtoms(parent.Atoms, operation.ParentId.N)
-		atom := parent.Atoms[operation.ParentId.N]
-		parent.Atoms[operation.ParentId.N] = Atom{
+		parent.Atoms = extendAtoms(parent.Atoms, operation.ParentN)
+		atom := parent.Atoms[operation.ParentN]
+		parent.Atoms[operation.ParentN] = Atom{
 			State: atom.State,
 			Atom:  atom.Atom,
 			Left:  insertNode(atom.Left, newNode),
@@ -117,18 +122,29 @@ func InsertNew(doc *Document, operation Operation) {
 	}
 }
 
-func DeleteN(doc *Document, operation Operation) {
-	node := doc.Nodes[operation.Id]
-	extendAtoms(node.Atoms, operation.Id.N)
-	atom := node.Atoms[operation.Id.N]
-	node.Atoms[operation.Id.N] = Atom{State: DEAD, Atom: atom.Atom, Left: atom.Left}
+func InsertRoot(doc *Document, operation Operation) {
+	newNode := &DocNode{
+		Parent: nil,
+		NodeId: operation.Id,
+	}
+	doc.Nodes[operation.Id] = newNode
+	newNode.Atoms = extendAtoms(newNode.Atoms, operation.N)
+	newNode.Atoms[operation.N] = Atom{Atom: operation.Atom, State: ALIVE}
+	doc.Doc = insertNode(doc.Doc, newNode)
 }
 
-func InsertN(doc *Document, operation Operation) {
+func Delete(doc *Document, operation Operation) {
 	node := doc.Nodes[operation.Id]
-	extendAtoms(node.Atoms, operation.Id.N)
-	atom := node.Atoms[operation.Id.N]
-	node.Atoms[operation.Id.N] = Atom{State: ALIVE, Atom: atom.Atom, Left: atom.Left}
+	node.Atoms = extendAtoms(node.Atoms, operation.N)
+	atom := node.Atoms[operation.N]
+	node.Atoms[operation.N] = Atom{State: DEAD, Atom: atom.Atom, Left: atom.Left}
+}
+
+func Insert(doc *Document, operation Operation) {
+	node := doc.Nodes[operation.Id]
+	node.Atoms = extendAtoms(node.Atoms, operation.N)
+	atom := node.Atoms[operation.N]
+	node.Atoms[operation.N] = Atom{State: ALIVE, Atom: operation.Atom, Left: atom.Left}
 }
 
 func DocToBuffer(doc *Document) *bytes.Buffer {
@@ -141,9 +157,6 @@ func DocToString(doc *Document) string {
 }
 
 func docToBufferHelper(disambiguator []*DocNode, buf *bytes.Buffer) *bytes.Buffer {
-	if disambiguator == nil {
-		return buf
-	}
 	for _, node := range disambiguator {
 		for _, atom := range node.Atoms {
 			buf = docToBufferHelper(atom.Left, buf)
@@ -161,20 +174,21 @@ func DebugDoc(doc *Document) {
 }
 
 func DebugDocHelper(disambiguator []*DocNode, indent string) {
-	if disambiguator == nil {
-		return
-	}
 	for _, node := range disambiguator {
 		for _, atom := range node.Atoms {
 			DebugDocHelper(atom.Left, indent+"  ")
 			if atom.State == ALIVE {
 				fmt.Print(indent)
+				fmt.Print("  ")
+				fmt.Printf("%q", atom.Atom)
 				fmt.Print(" ")
-				fmt.Print(atom.Atom)
+				fmt.Printf("%s\n", node.NodeId)
 			} else if atom.State == DEAD {
 				fmt.Print(indent)
-				fmt.Print("x")
-				fmt.Print(atom.Atom)
+				fmt.Print(" x")
+				fmt.Printf("%q", atom.Atom)
+				fmt.Print(" ")
+				fmt.Printf("%s\n", node.NodeId)
 			}
 		}
 		DebugDocHelper(node.Right, indent+"  ")
