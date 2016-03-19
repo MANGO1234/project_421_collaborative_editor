@@ -51,7 +51,7 @@ var RegMsg string = "registration"
 func listenForConn(listener *net.TCPListener) {
 	for {
 		conn, _ := listener.Accept()
-		handleConn(conn)
+		go handleConn(conn)
 	}
 }
 
@@ -76,7 +76,10 @@ func handleConn(conn net.Conn) {
 	//add this node to nodeMap
 	_, ok := nodeMetaData.NodeMap[msgIn.Id]
 	if !ok {
-		nodeMetaData.NodeMap[msgIn.Id] = Node{Addr: msgIn.Addr, Quitted: false, connected: true}
+		 newNode := Node{Addr: msgIn.Addr, Quitted: false, connected: true}
+		 addNodeToMap(newNode, msgIn.Id) 
+		 // connect to this node
+		 ConnectTo(msgIn.Addr)
 	}
 
 	// reply
@@ -122,7 +125,7 @@ func ConnectTo(remoteAddr string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(remoteAddr)
+	fmt.Println("connecting to: ", remoteAddr)
 	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
 	msgReader := util.MessageReader{bufio.NewReader(conn)}
 
