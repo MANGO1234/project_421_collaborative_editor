@@ -11,8 +11,8 @@ import (
 	"../util"
 	"bufio"
 	"encoding/json"
-	"github.com/satori/go.uuid"
 	"fmt"
+	"github.com/satori/go.uuid"
 	"net"
 	"sync"
 )
@@ -35,17 +35,38 @@ type ConnWrapper struct {
 }
 
 type NodeMetaData struct {
+	sync.Mutex
 	Id      string
 	Addr    string
 	NodeMap map[string]Node
 }
 
 // global variables
-var nodeMetaData NodeMetaData // keeps track of nodeMetaData
-var metaDataMutex = &sync.Mutex{}
+var nodeMetaData NodeMetaData = NodeMetaData{NodeMap: make(map[string]Node)} // keeps track of nodeMetaData
 
 // message type
 var RegMsg string = "registration"
+
+// initialize local network listener
+func Initialize(addr string) error {
+	lAddr, err := net.ResolveTCPAddr("tcp", addr)
+	listener, err := net.ListenTCP("tcp", lAddr)
+	fmt.Println("listening on ", lAddr.String())
+
+	if err == nil {
+		newUUID := uuid.NewV1().String()
+		nodeMetaData.Id = newUUID
+		nodeMetaData.Addr = lAddr.String()
+		go listenForConn(listener)
+	}
+
+	return err
+}
+
+// Disconnect from the network voluntarily
+func Disconnect() {
+
+}
 
 // listen for incoming connection to register
 func listenForConn(listener *net.TCPListener) {
@@ -57,11 +78,7 @@ func listenForConn(listener *net.TCPListener) {
 
 // handle node joining or rejoining
 func handleConn(conn net.Conn) {
-	// TODO: read incoming messages.
-	// Deal with following cases:
-
-	// :
-	// send saved nodeMap to that node, add that node to nodeMap, merge treedoc if necessary.
+	// send saved nodeMap to that node, add that node to nodeMap
 	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
 	msgReader := util.MessageReader{bufio.NewReader(conn)}
 	msgInType, m, err := msgReader.ReadMessage2()
@@ -73,20 +90,22 @@ func handleConn(conn net.Conn) {
 	fmt.Println("received message Type: ", msgInType) //
 	fmt.Println("received node data: ", msgIn.Id, msgIn.Addr)
 
-	//add this node to nodeMap
-	_, ok := nodeMetaData.NodeMap[msgIn.Id]
-	if !ok {
-		 newNode := Node{Addr: msgIn.Addr, Quitted: false, connected: true}
-		 addNodeToMap(newNode, msgIn.Id) 
-		 // connect to this node
-		 ConnectTo(msgIn.Addr)
-	}
-
 	// reply
 	if msgInType == RegMsg {
 		msg, _ := json.Marshal(nodeMetaData)
 		msgWriter.WriteMessage2(RegMsg, msg)
 	}
+
+	//add this node to nodeMap
+	nodeMetaData.Lock()
+	_, ok := nodeMetaData.NodeMap[msgIn.Id]
+	if !ok {
+		newNode := Node{Addr: msgIn.Addr, Quitted: false, connected: true}
+		addNodeToMap(newNode, msgIn.Id)
+		// connect to this node
+		connectToHelper(msgIn.Addr)
+	}
+	nodeMetaData.Unlock()
 	// for error checking
 	for _, value := range nodeMetaData.NodeMap {
 		fmt.Println("connected1 node addrs: ", value.Addr)
@@ -104,24 +123,15 @@ func handleConn(conn net.Conn) {
 	// ** for any received messages, broadcast may be required depending on the situation
 }
 
-// initialize local network listener
-func Initialize(addr string) error {
-	lAddr, err := net.ResolveTCPAddr("tcp", addr)
-	listener, err := net.ListenTCP("tcp", lAddr)
-	fmt.Println("listening on ", lAddr.String())
-
-	if err == nil {
-		newUUID := uuid.NewV1().String()
-		nodeMetaData = NodeMetaData{newUUID, lAddr.String(), make(map[string]Node)}
-		go listenForConn(listener)
-	}
-
-	return err
-}
-
 // All the following functions assume an Initialize call has been made
 
 func ConnectTo(remoteAddr string) error {
+	nodeMetaData.Lock()
+	defer nodeMetaData.Unlock()
+	return connectToHelper(remoteAddr)
+}
+
+func connectToHelper(remoteAddr string) error {
 	conn, err := net.Dial("tcp", remoteAddr)
 	if err != nil {
 		return err
@@ -166,11 +176,6 @@ func ConnectTo(remoteAddr string) error {
 	return err
 }
 
-// Disconnect from the network voluntarily
-func Disconnect() {
-
-}
-
 func Broadcast() {
 
 }
@@ -186,7 +191,7 @@ func handleNewNodes(receivedNodeMap map[string]Node) {
 		if !ok && key != nodeMetaData.Id {
 			addNodeToMap(value, key)
 			// TODO: Connect to the added node.
-			ConnectTo(value.Addr)
+			connectToHelper(value.Addr)
 		}
 	}
 }
