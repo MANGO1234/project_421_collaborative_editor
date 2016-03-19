@@ -41,7 +41,7 @@ type NodeMetaData struct {
 }
 
 // global variables
-var nodeMetaData = NodeMetaData{NodeMap: make(map[string]Node)} // keeps track of nodeMetaData
+var nodeMetaData NodeMetaData // keeps track of nodeMetaData
 var mapLock *sync.RWMutex
 
 // message type
@@ -71,8 +71,9 @@ func handleConn(conn net.Conn) {
 	err = json.Unmarshal(m, &msgIn)
 
 	fmt.Println("received message Type: ", msgInType) //
-	//add this node to nodeMap
+	fmt.Println("received node data: ", msgIn.Id, msgIn.Addr)
 
+	//add this node to nodeMap
 	_, ok := nodeMetaData.NodeMap[msgIn.Id]
 	if !ok {
 		nodeMetaData.NodeMap[msgIn.Id] = Node{Addr: msgIn.Addr, Quitted: false, connected: true}
@@ -83,6 +84,11 @@ func handleConn(conn net.Conn) {
 		msg, _ := json.Marshal(nodeMetaData)
 		msgWriter.WriteMessage2(RegMsg, msg)
 	}
+	// for error checking
+	for _, value := range nodeMetaData.NodeMap {
+		fmt.Println("connected1 node addrs: ", value.Addr)
+	}
+
 	// TODO: connect back to node
 
 	// known node quitting :
@@ -116,7 +122,7 @@ func ConnectTo(remoteAddr string) error {
 	if err != nil {
 		return err
 	}
-
+	fmt.Println(remoteAddr)
 	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
 	msgReader := util.MessageReader{bufio.NewReader(conn)}
 
@@ -133,7 +139,9 @@ func ConnectTo(remoteAddr string) error {
 	if msgType == RegMsg {
 		json.Unmarshal(msgBuff, &newNodeData)
 	}
-	fmt.Println("received", msgType)
+
+	// for checking
+	fmt.Println("reply type:", msgType)
 
 	// save new node to map
 	var newNode Node
@@ -141,10 +149,15 @@ func ConnectTo(remoteAddr string) error {
 	newNode.connected = true
 	outConnWrapper := ConnWrapper{&msgReader, &msgWriter}
 	newNode.out = &outConnWrapper
-	
+
 	addNodeToMap(newNode, newNodeData.Id)
-	
+
 	handleNewNodes(newNodeData.NodeMap)
+
+	/*
+		for _, value := range nodeMetaData.NodeMap {
+		fmt.Println("connected node addrs: ", value.Addr)
+		}*/
 
 	return err
 }
@@ -161,9 +174,10 @@ func handleNewNodes(receivedNodeMap map[string]Node) {
 
 	for key, value := range receivedNodeMap {
 		_, ok := nodeMetaData.NodeMap[key]
-		if !ok {
+		if !ok && key != nodeMetaData.Id {
 			addNodeToMap(value, key)
 			// TODO: Connect to the added node.
+			ConnectTo(value.Addr)
 		}
 	}
 }
