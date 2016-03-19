@@ -11,8 +11,8 @@ import (
 	"../util"
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"github.com/satori/go.uuid"
+	"fmt"
 	"net"
 	"sync"
 )
@@ -42,12 +42,12 @@ type NodeMetaData struct {
 
 // global variables
 var nodeMetaData NodeMetaData // keeps track of nodeMetaData
-var mapLock *sync.RWMutex
+var metaDataMutex = &sync.Mutex{}
 
 // message type
 var RegMsg string = "registration"
 
-// listen for incoming connection
+// listen for incoming connection to register
 func listenForConn(listener *net.TCPListener) {
 	for {
 		conn, _ := listener.Accept()
@@ -55,12 +55,12 @@ func listenForConn(listener *net.TCPListener) {
 	}
 }
 
-// handle incoming connection
+// handle node joining or rejoining
 func handleConn(conn net.Conn) {
 	// TODO: read incoming messages.
 	// Deal with following cases:
 
-	// new node joining :
+	// :
 	// send saved nodeMap to that node, add that node to nodeMap, merge treedoc if necessary.
 	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
 	msgReader := util.MessageReader{bufio.NewReader(conn)}
@@ -91,6 +91,7 @@ func handleConn(conn net.Conn) {
 
 	// TODO: connect back to node
 
+	// node quitting should be done on existing connection
 	// known node quitting :
 	// set map[node].Quitted = true.
 
@@ -160,6 +161,11 @@ func ConnectTo(remoteAddr string) error {
 		}*/
 
 	return err
+}
+
+// Disconnect from the network voluntarily
+func Disconnect() {
+
 }
 
 func Broadcast() {
