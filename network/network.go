@@ -37,16 +37,13 @@ type ConnWrapper struct {
 type NodeMetaData struct {
 	Id   string
 	Addr string
-}
-
-type NodeMap struct {
-	sync.RWMutex
-	Nodes map[string]Node
+	NodeMap map[string]Node
 }
 
 // global variables
-var nodeMetaData NodeMetaData                       // keeps track of current node's information
-var nodeMap = NodeMap{Nodes: make(map[string]Node)} // keeps track of all nodes in the system
+var nodeMetaData NodeMetaData{NodeMap: make(map[string]Node)}       // keeps track of nodeMetaData
+var mapLock *sync.RWMutex
+
 
 // message type
 var RegMsg string = "registration"
@@ -94,14 +91,59 @@ func Initialize(addr string) error {
 
 func ConnectTo(remoteAddr string) error {
 	conn, err := net.Dial("tcp", remoteAddr)
-	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
+	if err != nil {
+		return err
+	}
 
+	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
+	msgReader := util.MessageReader{bufio.NewReader(conn)}
+
+	// send registration information
 	msg, _ := json.Marshal(nodeMetaData)
-	msgWriter.WriteMessage2(RegMsg, msg)
+	err = msgWriter.WriteMessage2(RegMsg, msg)
+	handleError(err)
+
+	// receive registration information
+	msgType, msgBuff, err := msgReader.ReadMessage2()
+	handleError(err)
+	var newNodeData NodeMetaData
+	if msgType == RegMsg {
+		json.Unmarshal(msgBuff,&newNodeData)
+	}
+
+	// save new node to map
+	var newNode Node
+	newNode.Addr = newNodeData.Addr
+	newNode.connected = true
+	outConnWrapper := ConnWrapper{&msgReader, &msgWriter}
+	newNode.out = &outConnWrapper
+
+	addNodeToMap(newNode, newNodeData.Id)
+	handleNewNodes(newNodeData.NodeMap)
 
 	return err
 }
 
 func Broadcast() {
+
+}
+
+func addNodeToMap(nodeData Node, nodeId string){
+	nodeMetaData.NodeMap[nodeId] = nodeData
+}
+
+func handleNewNodes(receivedNodeMap map[string]Node) {
+	mapLock.Lock()
+	defer mapLock.Unlock()
+	for key, value := range receivedNodeMap{
+	     _ , ok := nodeMetaData.NodeMap[key]
+	     if !ok {
+	     	addNodeToMap(value,key)
+	     	// TODO: Connect to the added node.
+	     }
+	}
+}
+
+func handleError(){
 
 }
