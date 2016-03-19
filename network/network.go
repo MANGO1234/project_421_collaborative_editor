@@ -72,12 +72,11 @@ func handleConn(conn net.Conn) {
 
 	fmt.Println("received message Type: ", msgInType) //
 	//add this node to nodeMap
-	mapLock.Lock()
+
 	_, ok := nodeMetaData.NodeMap[msgIn.Id]
 	if !ok {
 		nodeMetaData.NodeMap[msgIn.Id] = Node{Addr: msgIn.Addr, Quitted: false, connected: true}
 	}
-	mapLock.Unlock()
 
 	// reply
 	if msgInType == RegMsg {
@@ -99,7 +98,7 @@ func handleConn(conn net.Conn) {
 func Initialize(addr string) error {
 	lAddr, err := net.ResolveTCPAddr("tcp", addr)
 	listener, err := net.ListenTCP("tcp", lAddr)
-	fmt.Println("listening on ", addr)
+	fmt.Println("listening on ", lAddr.String())
 
 	if err == nil {
 		newUUID := uuid.NewV1().String()
@@ -123,6 +122,7 @@ func ConnectTo(remoteAddr string) error {
 
 	// send registration information
 	msg, _ := json.Marshal(nodeMetaData)
+
 	err = msgWriter.WriteMessage2(RegMsg, msg)
 	handleError(err)
 
@@ -133,6 +133,7 @@ func ConnectTo(remoteAddr string) error {
 	if msgType == RegMsg {
 		json.Unmarshal(msgBuff, &newNodeData)
 	}
+	fmt.Println("received", msgType)
 
 	// save new node to map
 	var newNode Node
@@ -140,8 +141,9 @@ func ConnectTo(remoteAddr string) error {
 	newNode.connected = true
 	outConnWrapper := ConnWrapper{&msgReader, &msgWriter}
 	newNode.out = &outConnWrapper
-
+	
 	addNodeToMap(newNode, newNodeData.Id)
+	
 	handleNewNodes(newNodeData.NodeMap)
 
 	return err
@@ -156,8 +158,7 @@ func addNodeToMap(nodeData Node, nodeId string) {
 }
 
 func handleNewNodes(receivedNodeMap map[string]Node) {
-	mapLock.Lock()
-	defer mapLock.Unlock()
+
 	for key, value := range receivedNodeMap {
 		_, ok := nodeMetaData.NodeMap[key]
 		if !ok {

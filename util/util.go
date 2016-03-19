@@ -161,15 +161,21 @@ func (writer *MessageWriter) WriteMessage2(msgType string, msg []byte) error {
 // read a message, return msgType as string and message content as []byte.
 func (reader *MessageReader) ReadMessage2() (string , []byte , error) {
 	msgType, err := reader.Reader.ReadString(' ')
+	n := len(msgType)
+	if n > 0{
+		n -= 1
+	} else {
+		n = 0
+	}
 	if err != nil {
 		return "", nil, err
 	}
 
 	buff, err := reader.ReadMessageSlice()
 	if err != nil {
-		return msgType, nil, err
+		return msgType[:n], nil, err
 	} else {
-		return msgType, buff, err
+		return msgType[:n], buff, err
 	}
 
 }
