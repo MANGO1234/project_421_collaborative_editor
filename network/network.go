@@ -12,7 +12,7 @@ import (
 	"bufio"
 	"github.com/satori/go.uuid"
 	"net"
-	//	"fmt"
+	"fmt"
 	"encoding/json"
 	"sync"
 )
@@ -37,16 +37,16 @@ type ConnWrapper struct {
 type NodeMetaData struct {
 	Id   string
 	Addr string
-}
-
-type NodeMap struct {
-	sync.RWMutex
 	Nodes map[string]Node
 }
+
+var mapLock	*sync.RWMutex
+
 
 // global variables
 var nodeMetaData NodeMetaData                       // keeps track of current node's information
 var nodeMap = NodeMap{Nodes: make(map[string]Node)} // keeps track of all nodes in the system
+nodeMetaData.Nodes = nodeMap
 
 // message type
 var RegMsg string = "registration"
@@ -66,6 +66,23 @@ func handleConn(conn net.Conn) {
 
 	// new node joining :
 	// send saved nodeMap to that node, add that node to nodeMap, merge treedoc if necessary.
+	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
+	msgReader := util.MessageReader{bufio.NewReader(conn)}
+	msgInType, msgIn, err := msgReader.ReadMessage2()
+	connWrapper := ConnWrapper{&ConnReader:msgReader, &ConnWriter:msgWriter}
+	util.CheckError(err)
+
+	fmt.Println("received message: ", string(msgIn), "asType: ", msgInType) //
+	//add this node to nodeMap
+	mapLock.lock()
+	if(nodeMetaData.NodeMap[msgIn.Id] == nil){
+	nodeMetaData.NodeMap[msgIn.Id] = Node{Addr: msgIn.Addr, Quitted: false, connected: true, in: connWrapper}
+	}
+	mapLock.Unlock()
+
+	ftm.Println("send info: ", string(msgOut), "ofType: ", msgOutType)
+
+
 
 	// known node quitting :
 	// set map[node].Quitted = true.
@@ -80,6 +97,7 @@ func handleConn(conn net.Conn) {
 func Initialize(addr string) error {
 	lAddr, err := net.ResolveTCPAddr("tcp", addr)
 	listener, err := net.ListenTCP("tcp", lAddr)
+	fmt.Println("listening on ", addr)
 
 	if err == nil {
 		newUUID := uuid.NewV1().String()
@@ -96,7 +114,7 @@ func ConnectTo(remoteAddr string) error {
 	conn, err := net.Dial("tcp", remoteAddr)
 	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
 
-	msg, _ := json.Marshal(nodeMetaData)
+	msg, _ := json.Marshal(nodeMetaData) 
 	msgWriter.WriteMessage2(RegMsg, msg)
 
 	return err
