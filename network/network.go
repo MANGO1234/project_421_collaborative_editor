@@ -10,10 +10,10 @@ package network
 import (
 	"../util"
 	"bufio"
+	"encoding/json"
+	"fmt"
 	"github.com/satori/go.uuid"
 	"net"
-	//	"fmt"
-	"encoding/json"
 	"sync"
 )
 
@@ -35,15 +35,16 @@ type ConnWrapper struct {
 }
 
 type NodeMetaData struct {
-	Id   string
-	Addr string
+	Id      string
+	Addr    string
 	NodeMap map[string]Node
 }
 
-// global variables
-var nodeMetaData NodeMetaData{NodeMap: make(map[string]Node)}       // keeps track of nodeMetaData
 var mapLock *sync.RWMutex
 
+// global variables
+var nodeMetaData = NodeMetaData{NodeMap: make(map[string]Node)} // keeps track of nodeMetaData
+var mapLock *sync.RWMutex
 
 // message type
 var RegMsg string = "registration"
@@ -63,6 +64,21 @@ func handleConn(conn net.Conn) {
 
 	// new node joining :
 	// send saved nodeMap to that node, add that node to nodeMap, merge treedoc if necessary.
+	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
+	msgReader := util.MessageReader{bufio.NewReader(conn)}
+	msgInType, msgIn, err := msgReader.ReadMessage2()
+	connWrapper := ConnWrapper{&ConnReader: msgReader, &ConnWriter: msgWriter}
+	util.CheckError(err)
+
+	fmt.Println("received message: ", string(msgIn), "asType: ", msgInType) //
+	//add this node to nodeMap
+	mapLock.lock()
+	if nodeMetaData.NodeMap[msgIn.Id] == nil {
+		nodeMetaData.NodeMap[msgIn.Id] = Node{Addr: msgIn.Addr, Quitted: false, connected: true, in: connWrapper}
+	}
+	mapLock.Unlock()
+
+	ftm.Println("send info: ", string(msgOut), "ofType: ", msgOutType)
 
 	// known node quitting :
 	// set map[node].Quitted = true.
@@ -77,6 +93,7 @@ func handleConn(conn net.Conn) {
 func Initialize(addr string) error {
 	lAddr, err := net.ResolveTCPAddr("tcp", addr)
 	listener, err := net.ListenTCP("tcp", lAddr)
+	fmt.Println("listening on ", addr)
 
 	if err == nil {
 		newUUID := uuid.NewV1().String()
@@ -108,7 +125,7 @@ func ConnectTo(remoteAddr string) error {
 	handleError(err)
 	var newNodeData NodeMetaData
 	if msgType == RegMsg {
-		json.Unmarshal(msgBuff,&newNodeData)
+		json.Unmarshal(msgBuff, &newNodeData)
 	}
 
 	// save new node to map
@@ -128,22 +145,22 @@ func Broadcast() {
 
 }
 
-func addNodeToMap(nodeData Node, nodeId string){
+func addNodeToMap(nodeData Node, nodeId string) {
 	nodeMetaData.NodeMap[nodeId] = nodeData
 }
 
 func handleNewNodes(receivedNodeMap map[string]Node) {
 	mapLock.Lock()
 	defer mapLock.Unlock()
-	for key, value := range receivedNodeMap{
-	     _ , ok := nodeMetaData.NodeMap[key]
-	     if !ok {
-	     	addNodeToMap(value,key)
-	     	// TODO: Connect to the added node.
-	     }
+	for key, value := range receivedNodeMap {
+		_, ok := nodeMetaData.NodeMap[key]
+		if !ok {
+			addNodeToMap(value, key)
+			// TODO: Connect to the added node.
+		}
 	}
 }
 
-func handleError(){
+func handleError() {
 
 }
