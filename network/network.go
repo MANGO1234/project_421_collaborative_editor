@@ -88,7 +88,7 @@ func handleConn(conn net.Conn) {
 	err = json.Unmarshal(m, &msgIn)
 
 	fmt.Println("received message Type: ", msgInType) //
-	fmt.Println("received node data: ", msgIn.Id, msgIn.Addr)
+	fmt.Println("received node data: ", string(m))
 
 	// reply
 	if msgInType == RegMsg {
@@ -105,22 +105,8 @@ func handleConn(conn net.Conn) {
 		// connect to this node
 		connectToHelper(msgIn.Addr)
 	}
+	handleNewNodes(msgIn.NodeMap)
 	nodeMetaData.Unlock()
-	// for error checking
-	for _, value := range nodeMetaData.NodeMap {
-		fmt.Println("connected1 node addrs: ", value.Addr)
-	}
-
-	// TODO: connect back to node
-
-	// node quitting should be done on existing connection
-	// known node quitting :
-	// set map[node].Quitted = true.
-
-	// editing treedoc:
-	// modify treedoc
-
-	// ** for any received messages, broadcast may be required depending on the situation
 }
 
 // All the following functions assume an Initialize call has been made
@@ -168,12 +154,14 @@ func connectToHelper(remoteAddr string) error {
 
 	handleNewNodes(newNodeData.NodeMap)
 
-	/*
-		for _, value := range nodeMetaData.NodeMap {
-		fmt.Println("connected node addrs: ", value.Addr)
-		}*/
-
 	return err
+}
+
+func GetNetworkMetadata() string {
+	nodeMetaData.Lock()
+	defer nodeMetaData.Unlock()
+	meta, _ := json.Marshal(nodeMetaData)
+	return string(meta)
 }
 
 func Broadcast() {
