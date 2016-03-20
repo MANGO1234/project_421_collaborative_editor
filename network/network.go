@@ -35,9 +35,9 @@ type Node struct {
 }
 
 type ConnWrapper struct {
-	Connection net.Conn
-	ConnReader *util.MessageReader
-	ConnWriter *util.MessageWriter
+	conn   net.Conn
+	reader *util.MessageReader
+	writer *util.MessageWriter
 }
 
 type NodeMetaData struct {
@@ -93,12 +93,12 @@ func Disconnect() {
 	for _, node := range myMeta.NodeMap {
 		if !node.Quitted {
 			// close all existing incoming connections
-			node.in.Connection.Close()
+			node.in.conn.Close()
 			// send disconnection notice
-			err := node.out.ConnWriter.WriteMessage2(leaveMsg, make([]byte, 100))
+			err := node.out.writer.WriteMessage2(leaveMsg, make([]byte, 100))
 			handleError(err)
 			// close all outgoing connections
-			node.out.Connection.Close()
+			node.out.conn.Close()
 			fmt.Println("disconnected --- ", node.Addr)
 		}
 	}
@@ -114,43 +114,60 @@ func Reconnect() error {
 	return err
 }
 
+// get a new ConnWrapper around a connection
+func newConnWrapper(conn net.Conn) *ConnWrapper {
+	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
+	msgReader := util.MessageReader{bufio.NewReader(conn)}
+	wrapper := ConnWrapper{conn, &msgReader, &msgWriter}
+	return &wrapper
+}
+
 // handle node joining or rejoining
 func handleConn(conn net.Conn) {
 	// send saved nodeMap to that node, add that node to nodeMap
-	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
-	msgReader := util.MessageReader{bufio.NewReader(conn)}
-	msgInType, m, err := msgReader.ReadMessage2()
-	handleError(err)
+	wrapper := newConnWrapper(conn)
+
+	msgInType, m, err := wrapper.reader.ReadMessage2()
+	if err != nil || msgInType != regMsg {
+		conn.Close()
+		return
+	}
 
 	var msgIn NodeMetaData
 	err = json.Unmarshal(m, &msgIn)
-
-	fmt.Println("received message Type: ", msgInType) //
-	fmt.Println("received node data: ", string(m))
-
-	// reply
-	if msgInType == regMsg {
-		msg, _ := json.Marshal(myMeta)
-		msgWriter.WriteMessage2(regMsg, msg)
+	if err != nil {
+		conn.Close()
+		return
 	}
+
+	fmt.Println("---new-connection---: \n", string(m))
+
+	// TODO there's a potential locking problem here
+	msg, _ := json.Marshal(myMeta)
+	wrapper.writer.WriteMessage2(regMsg, msg)
 
 	//add this node to nodeMap
 	myMeta.Lock()
-	_, ok := myMeta.NodeMap[msgIn.Id]
+	node, ok := myMeta.NodeMap[msgIn.Id]
 	if !ok {
-		newNode := Node{Addr: msgIn.Addr, Quitted: false, connected: true}
+		newNode := Node{msgIn.Addr, false, true, wrapper, nil}
 		addNodeToMap(&newNode, msgIn.Id)
 		// connect to this node
 		connectToHelper(msgIn.Addr)
+	} else {
+		if node.in.conn != nil {
+			conn.Close()
+		}
+		node.in = wrapper
 	}
 	handleNewNodes(msgIn.NodeMap)
 	myMeta.Unlock()
 	for {
-		continueRead(msgIn.Id, msgReader)
+		continueRead(msgIn.Id, wrapper.reader)
 	}
 }
 
-func continueRead(id string, msgReader util.MessageReader) {
+func continueRead(id string, msgReader *util.MessageReader) {
 	//
 	msgInType, _, err := msgReader.ReadMessage2()
 	handleError(err)
@@ -158,7 +175,7 @@ func continueRead(id string, msgReader util.MessageReader) {
 	if msgInType == leaveMsg {
 		result, ok := myMeta.NodeMap[id]
 		if ok && result.connected {
-			result.out.Connection.Close()
+			result.out.conn.Close()
 			result.Quitted = true
 			result.connected = false
 			fmt.Println(myMeta.NodeMap[id].Addr, "-----quitted")

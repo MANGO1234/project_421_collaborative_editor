@@ -16,6 +16,8 @@ func Debug(v ...interface{}) {
 	}
 }
 
+// TODO: implement a pretty print function
+
 func CheckError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error ", err.Error())
