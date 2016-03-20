@@ -67,6 +67,8 @@ func main() {
 			// TODO: export the current doc into path
 		case "printDoc":
 			// TODO: print current doc
+		case "printNetMeta":
+			fmt.Println(network.GetNetworkMetadata())
 		case "help":
 			// TODO: print a help menu
 		case "quit":
