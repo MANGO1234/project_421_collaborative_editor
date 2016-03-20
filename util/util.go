@@ -23,6 +23,12 @@ func CheckError(err error) {
 	}
 }
 
+func PrintError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error ", err.Error())
+	}
+}
+
 func UInt32ToStr(n uint32) string {
 	return strconv.FormatUint(uint64(n), 10)
 }
@@ -115,7 +121,6 @@ func (writer *MessageWriter) WriteMessage(str string) error {
 	return err
 }
 
-
 func (writer *MessageWriter) WriteMessageSlice(str []byte) error {
 	n := len(str)
 	_, err := writer.Writer.WriteString(strconv.Itoa(n))
@@ -159,10 +164,10 @@ func (writer *MessageWriter) WriteMessage2(msgType string, msg []byte) error {
 }
 
 // read a message, return msgType as string and message content as []byte.
-func (reader *MessageReader) ReadMessage2() (string , []byte , error) {
+func (reader *MessageReader) ReadMessage2() (string, []byte, error) {
 	msgType, err := reader.Reader.ReadString(' ')
 	n := len(msgType)
-	if n > 0{
+	if n > 0 {
 		n -= 1
 	} else {
 		n = 0

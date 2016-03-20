@@ -5,6 +5,8 @@
 // Set-up:
 // $ go get github.com/satori/go.uuid
 
+// TODO: debug mode to log any errors
+
 package network
 
 import (
@@ -20,11 +22,14 @@ import (
 // data structures
 
 type Node struct {
-	Addr    string
-	Quitted bool // node is forever quitted if it voluntarily leave the network
+	// listening ip:port
+	Addr string
+	// quitted if the node voluntarily leaves the network
+	// what's quitted stays quitted
+	Quitted bool
 
-	// fields below are for local communication purpose
-	connected bool // true if current node is connected to target node
+	// fields below are for internal operations
+	connected bool
 	in        *ConnWrapper
 	out       *ConnWrapper
 }
@@ -42,43 +47,34 @@ type NodeMetaData struct {
 	NodeMap map[string]*Node
 }
 
-// global variables
-var nodeMetaData NodeMetaData = NodeMetaData{NodeMap: make(map[string]*Node)} // keeps track of nodeMetaData
+// message type identifiers
+const regMsg string = "registration"
+const leaveMsg string = "disconnection"
 
-// message type
-var RegMsg string = "registration"
-var LeaveMsg string = "disconnection"
+// global variables
+var myMeta NodeMetaData = NodeMetaData{NodeMap: make(map[string]*Node)} // keeps track of my NodeMetaData
+var myAddr string
+var myListener *net.TCPListener
 
 // initialize local network listener
 func Initialize(addr string) error {
-	lAddr, err := net.ResolveTCPAddr("tcp", addr)
-	listener, err := net.ListenTCP("tcp", lAddr)
-	fmt.Println("listening on ", lAddr.String())
-
-	if err == nil {
-		newUUID := uuid.NewV1().String()
-		nodeMetaData.Id = newUUID
-		nodeMetaData.Addr = lAddr.String()
-		go listenForConn(listener)
-	}
-
-	return err
+	myAddr = addr
+	return startNewSession(addr)
 }
 
-// Disconnect from the network voluntarily
-func Disconnect() {
-	//close all outgoing connection
-	for _, value := range nodeMetaData.NodeMap {
-		if !value.Quitted {
-			// send disconnection information
-			err := value.out.ConnWriter.WriteMessage2(LeaveMsg, make([]byte, 100))
-			handleError(err)
-			// close all out connection
-			value.out.Connection.Close()
-			fmt.Println("disconnected --- ", value.Addr)
-		}
+func startNewSession(addr string) error {
+	lAddr, err := net.ResolveTCPAddr("tcp", addr)
+	if err != nil {
+		return err
 	}
-	// start newUUID
+	myListener, err = net.ListenTCP("tcp", lAddr)
+	if err == nil {
+		fmt.Println("listening on ", lAddr.String())
+		myMeta.Id = uuid.NewV1().String()
+		myMeta.Addr = lAddr.String()
+		go listenForConn(myListener)
+	}
+	return err
 }
 
 // listen for incoming connection to register
@@ -87,6 +83,35 @@ func listenForConn(listener *net.TCPListener) {
 		conn, _ := listener.Accept()
 		go handleConn(conn)
 	}
+}
+
+// Disconnect from the network voluntarily
+func Disconnect() {
+	// refuse new incoming connections
+	myListener.Close() // best attemp, error ignored
+	// close all incoming and outgoing connection
+	for _, node := range myMeta.NodeMap {
+		if !node.Quitted {
+			// close all existing incoming connections
+			node.in.Connection.Close()
+			// send disconnection notice
+			err := node.out.ConnWriter.WriteMessage2(leaveMsg, make([]byte, 100))
+			handleError(err)
+			// close all outgoing connections
+			node.out.Connection.Close()
+			fmt.Println("disconnected --- ", node.Addr)
+		}
+	}
+}
+
+// Reconnect
+func Reconnect() error {
+	err := startNewSession(myAddr)
+	if err != nil {
+		return err
+	}
+	// TODO connect to all previously known nodes
+	return err
 }
 
 // handle node joining or rejoining
@@ -104,14 +129,14 @@ func handleConn(conn net.Conn) {
 	fmt.Println("received node data: ", string(m))
 
 	// reply
-	if msgInType == RegMsg {
-		msg, _ := json.Marshal(nodeMetaData)
-		msgWriter.WriteMessage2(RegMsg, msg)
+	if msgInType == regMsg {
+		msg, _ := json.Marshal(myMeta)
+		msgWriter.WriteMessage2(regMsg, msg)
 	}
 
 	//add this node to nodeMap
-	nodeMetaData.Lock()
-	_, ok := nodeMetaData.NodeMap[msgIn.Id]
+	myMeta.Lock()
+	_, ok := myMeta.NodeMap[msgIn.Id]
 	if !ok {
 		newNode := Node{Addr: msgIn.Addr, Quitted: false, connected: true}
 		addNodeToMap(&newNode, msgIn.Id)
@@ -119,7 +144,7 @@ func handleConn(conn net.Conn) {
 		connectToHelper(msgIn.Addr)
 	}
 	handleNewNodes(msgIn.NodeMap)
-	nodeMetaData.Unlock()
+	myMeta.Unlock()
 	for {
 		continueRead(msgIn.Id, msgReader)
 	}
@@ -130,13 +155,13 @@ func continueRead(id string, msgReader util.MessageReader) {
 	msgInType, _, err := msgReader.ReadMessage2()
 	handleError(err)
 
-	if msgInType == LeaveMsg {
-		result, ok := nodeMetaData.NodeMap[id]
+	if msgInType == leaveMsg {
+		result, ok := myMeta.NodeMap[id]
 		if ok && result.connected {
 			result.out.Connection.Close()
 			result.Quitted = true
 			result.connected = false
-			fmt.Println(nodeMetaData.NodeMap[id].Addr, "-----quitted")
+			fmt.Println(myMeta.NodeMap[id].Addr, "-----quitted")
 		}
 	}
 
@@ -145,8 +170,8 @@ func continueRead(id string, msgReader util.MessageReader) {
 // All the following functions assume an Initialize call has been made
 
 func ConnectTo(remoteAddr string) error {
-	nodeMetaData.Lock()
-	defer nodeMetaData.Unlock()
+	myMeta.Lock()
+	defer myMeta.Unlock()
 	return connectToHelper(remoteAddr)
 }
 
@@ -160,16 +185,16 @@ func connectToHelper(remoteAddr string) error {
 	msgReader := util.MessageReader{bufio.NewReader(conn)}
 
 	// send registration information
-	msg, _ := json.Marshal(nodeMetaData)
+	msg, _ := json.Marshal(myMeta)
 
-	err = msgWriter.WriteMessage2(RegMsg, msg)
+	err = msgWriter.WriteMessage2(regMsg, msg)
 	handleError(err)
 
 	// receive registration information
 	msgType, msgBuff, err := msgReader.ReadMessage2()
 	handleError(err)
 	var newNodeData NodeMetaData
-	if msgType == RegMsg {
+	if msgType == regMsg {
 		json.Unmarshal(msgBuff, &newNodeData)
 	}
 
@@ -191,9 +216,9 @@ func connectToHelper(remoteAddr string) error {
 }
 
 func GetNetworkMetadata() string {
-	nodeMetaData.Lock()
-	defer nodeMetaData.Unlock()
-	meta, _ := json.Marshal(nodeMetaData)
+	myMeta.Lock()
+	defer myMeta.Unlock()
+	meta, _ := json.Marshal(myMeta)
 	return string(meta)
 }
 
@@ -201,15 +226,16 @@ func Broadcast() {
 
 }
 
+// TODO restructure this
 func addNodeToMap(nodeData *Node, nodeId string) {
-	nodeMetaData.NodeMap[nodeId] = nodeData
+	myMeta.NodeMap[nodeId] = nodeData
 }
 
 func handleNewNodes(receivedNodeMap map[string]*Node) {
 
 	for key, value := range receivedNodeMap {
-		_, ok := nodeMetaData.NodeMap[key]
-		if !ok && key != nodeMetaData.Id {
+		_, ok := myMeta.NodeMap[key]
+		if !ok && key != myMeta.Id {
 			addNodeToMap(value, key)
 			// TODO: Connect to the added node.
 			connectToHelper(value.Addr)

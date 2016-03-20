@@ -39,10 +39,12 @@ func main() {
 			scanner.Scan()
 			remoteAddr := scanner.Text()
 			err = network.ConnectTo(remoteAddr)
-			// TODO deal with err
+			util.PrintError(err) // TODO deal with err
 		case "disconnect":
 			// TODO: disconnect to the network
 			network.Disconnect()
+		case "reconnect":
+			network.Reconnect()
 		case "insert":
 			fmt.Print("insert > ")
 			scanner.Scan()
