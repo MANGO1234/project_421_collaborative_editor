@@ -69,12 +69,14 @@ func Initialize(addr string) error {
 func Disconnect() {
 	//close all outgoing connection
 	for _, value := range nodeMetaData.NodeMap {
-		// send disconnection information
-		err := value.out.ConnWriter.WriteMessage2(LeaveMsg, make([]byte, 100))
-		handleError(err)
-		// close all out connection
-		value.out.Connection.Close()
-		fmt.Println("disconnected --- ", value.Addr)
+		if !value.Quitted {
+			// send disconnection information
+			err := value.out.ConnWriter.WriteMessage2(LeaveMsg, make([]byte, 100))
+			handleError(err)
+			// close all out connection
+			value.out.Connection.Close()
+			fmt.Println("disconnected --- ", value.Addr)
+		}
 	}
 }
 
@@ -129,9 +131,10 @@ func continueRead(id string, msgReader util.MessageReader) {
 
 	if msgInType == LeaveMsg {
 		result, ok := nodeMetaData.NodeMap[id]
-		if ok {
-			result.out.Connection.Close()
-			result.Quitted = true
+		if ok && !result.Quitted {
+
+			nodeMetaData.NodeMap[id].out.Connection.Close()
+			nodeMetaData.NodeMap[id] = Node{Addr: result.Addr, Quitted: true, connected: false}
 			fmt.Println(nodeMetaData.NodeMap[id].Addr, "-----quitted")
 		}
 	}
