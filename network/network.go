@@ -198,17 +198,16 @@ func connectToHelper(remoteAddr string) error {
 		return err
 	}
 	fmt.Println("connecting to: ", remoteAddr)
-	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
-	msgReader := util.MessageReader{bufio.NewReader(conn)}
+	wrapper := newConnWrapper(conn)
 
 	// send registration information
 	msg, _ := json.Marshal(myMeta)
 
-	err = msgWriter.WriteMessage2(regMsg, msg)
+	err = wrapper.writer.WriteMessage2(regMsg, msg)
 	handleError(err)
 
 	// receive registration information
-	msgType, msgBuff, err := msgReader.ReadMessage2()
+	msgType, msgBuff, err := wrapper.reader.ReadMessage2()
 	handleError(err)
 	var newNodeData NodeMetaData
 	if msgType == regMsg {
@@ -222,9 +221,10 @@ func connectToHelper(remoteAddr string) error {
 	var newNode Node
 	newNode.Addr = newNodeData.Addr
 	newNode.connected = true
-	outConnWrapper := ConnWrapper{conn, &msgReader, &msgWriter}
-	newNode.out = &outConnWrapper
+	newNode.out = wrapper
 
+	// TODO should check if we already added it before
+	// and adjust accordingly
 	addNodeToMap(&newNode, newNodeData.Id)
 
 	handleNewNodes(newNodeData.NodeMap)
