@@ -39,11 +39,11 @@ type NodeMetaData struct {
 	sync.Mutex
 	Id      string
 	Addr    string
-	NodeMap map[string]Node
+	NodeMap map[string]*Node
 }
 
 // global variables
-var nodeMetaData NodeMetaData = NodeMetaData{NodeMap: make(map[string]Node)} // keeps track of nodeMetaData
+var nodeMetaData NodeMetaData = NodeMetaData{NodeMap: make(map[string]*Node)} // keeps track of nodeMetaData
 
 // message type
 var RegMsg string = "registration"
@@ -78,6 +78,7 @@ func Disconnect() {
 			fmt.Println("disconnected --- ", value.Addr)
 		}
 	}
+	// start newUUID
 }
 
 // listen for incoming connection to register
@@ -113,7 +114,7 @@ func handleConn(conn net.Conn) {
 	_, ok := nodeMetaData.NodeMap[msgIn.Id]
 	if !ok {
 		newNode := Node{Addr: msgIn.Addr, Quitted: false, connected: true}
-		addNodeToMap(newNode, msgIn.Id)
+		addNodeToMap(&newNode, msgIn.Id)
 		// connect to this node
 		connectToHelper(msgIn.Addr)
 	}
@@ -131,10 +132,10 @@ func continueRead(id string, msgReader util.MessageReader) {
 
 	if msgInType == LeaveMsg {
 		result, ok := nodeMetaData.NodeMap[id]
-		if ok && !result.Quitted {
-
-			nodeMetaData.NodeMap[id].out.Connection.Close()
-			nodeMetaData.NodeMap[id] = Node{Addr: result.Addr, Quitted: true, connected: false}
+		if ok && result.connected {
+			result.out.Connection.Close()
+			result.Quitted = true
+			result.connected = false
 			fmt.Println(nodeMetaData.NodeMap[id].Addr, "-----quitted")
 		}
 	}
@@ -182,7 +183,7 @@ func connectToHelper(remoteAddr string) error {
 	outConnWrapper := ConnWrapper{conn, &msgReader, &msgWriter}
 	newNode.out = &outConnWrapper
 
-	addNodeToMap(newNode, newNodeData.Id)
+	addNodeToMap(&newNode, newNodeData.Id)
 
 	handleNewNodes(newNodeData.NodeMap)
 
@@ -200,11 +201,11 @@ func Broadcast() {
 
 }
 
-func addNodeToMap(nodeData Node, nodeId string) {
+func addNodeToMap(nodeData *Node, nodeId string) {
 	nodeMetaData.NodeMap[nodeId] = nodeData
 }
 
-func handleNewNodes(receivedNodeMap map[string]Node) {
+func handleNewNodes(receivedNodeMap map[string]*Node) {
 
 	for key, value := range receivedNodeMap {
 		_, ok := nodeMetaData.NodeMap[key]
