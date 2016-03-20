@@ -30,6 +30,7 @@ type Node struct {
 }
 
 type ConnWrapper struct {
+	Connection net.Conn
 	ConnReader *util.MessageReader
 	ConnWriter *util.MessageWriter
 }
@@ -46,6 +47,7 @@ var nodeMetaData NodeMetaData = NodeMetaData{NodeMap: make(map[string]Node)} // 
 
 // message type
 var RegMsg string = "registration"
+var LeaveMsg string = "disconnection"
 
 // initialize local network listener
 func Initialize(addr string) error {
@@ -65,7 +67,15 @@ func Initialize(addr string) error {
 
 // Disconnect from the network voluntarily
 func Disconnect() {
-
+	//close all outgoing connection
+	for _, value := range nodeMetaData.NodeMap {
+		// send disconnection information
+		err := value.out.ConnWriter.WriteMessage2(LeaveMsg, make([]byte, 100))
+		handleError(err)
+		// close all out connection
+		value.out.Connection.Close()
+		fmt.Println("disconnected --- ", value.Addr)
+	}
 }
 
 // listen for incoming connection to register
@@ -110,6 +120,9 @@ func handleConn(conn net.Conn) {
 	for _, value := range nodeMetaData.NodeMap {
 		fmt.Println("connected1 node addrs: ", value.Addr)
 	}
+	for {
+		continueRead(msgIn.Id, msgReader)
+	}
 
 	// TODO: connect back to node
 
@@ -121,6 +134,22 @@ func handleConn(conn net.Conn) {
 	// modify treedoc
 
 	// ** for any received messages, broadcast may be required depending on the situation
+}
+
+func continueRead(id string, msgReader util.MessageReader) {
+	//
+	msgInType, _, err := msgReader.ReadMessage2()
+	handleError(err)
+
+	if msgInType == LeaveMsg {
+		result, ok := nodeMetaData.NodeMap[id]
+		if ok {
+			result.out.Connection.Close()
+			result.Quitted = true
+			fmt.Println(nodeMetaData.NodeMap[id].Addr, "-----quitted")
+		}
+	}
+
 }
 
 // All the following functions assume an Initialize call has been made
@@ -161,7 +190,7 @@ func connectToHelper(remoteAddr string) error {
 	var newNode Node
 	newNode.Addr = newNodeData.Addr
 	newNode.connected = true
-	outConnWrapper := ConnWrapper{&msgReader, &msgWriter}
+	outConnWrapper := ConnWrapper{conn, &msgReader, &msgWriter}
 	newNode.out = &outConnWrapper
 
 	addNodeToMap(newNode, newNodeData.Id)

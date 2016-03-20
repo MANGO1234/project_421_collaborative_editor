@@ -42,6 +42,7 @@ func main() {
 			// TODO deal with err
 		case "disconnect":
 			// TODO: disconnect to the network
+			network.Disconnect()
 		case "insert":
 			fmt.Print("insert > ")
 			scanner.Scan()
