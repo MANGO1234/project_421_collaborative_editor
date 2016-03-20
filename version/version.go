@@ -43,16 +43,6 @@ func (vector VersionVector) Copy() VersionVector {
 }
 
 func (v1 VersionVector) Compare(v2 VersionVector) int {
-	if len(v2) > len(v1) {
-		r := v2.Compare(v1)
-		if r == LESS_THAN {
-			return GREATER_THAN
-		} else if r == GREATER_THAN {
-			return LESS_THAN
-		}
-		return r
-	}
-
 	r := EQUAL
 	for k, v := range v1 {
 		if v > v2[k] {
@@ -65,6 +55,22 @@ func (v1 VersionVector) Compare(v2 VersionVector) int {
 			if r == EQUAL {
 				r = LESS_THAN
 			} else if r == GREATER_THAN {
+				return CONFLICT
+			}
+		}
+	}
+
+	for k, v := range v2 {
+		if v > v1[k] {
+			if r == EQUAL {
+				r = LESS_THAN
+			} else if r == GREATER_THAN {
+				return CONFLICT
+			}
+		} else if v < v1[k] {
+			if r == EQUAL {
+				r = GREATER_THAN
+			} else if r == LESS_THAN {
 				return CONFLICT
 			}
 		}
