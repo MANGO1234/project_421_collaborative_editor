@@ -17,6 +17,7 @@ import (
 	"github.com/satori/go.uuid"
 	"net"
 	"sync"
+	"errors"
 )
 
 // data structures
@@ -45,6 +46,8 @@ type NodeMetaData struct {
 	Id           string
 	Addr         string
 	NodeMap      map[string]*Node
+	listener     *net.TCPListener
+	initialized  bool
 }
 
 // message type identifiers
@@ -53,12 +56,9 @@ const leaveMsg string = "disconnection"
 
 // global variables
 var myMeta NodeMetaData = NodeMetaData{NodeMap: make(map[string]*Node)} // keeps track of my NodeMetaData
-var myAddr string
-var myListener *net.TCPListener
 
 // initialize local network listener
 func Initialize(addr string) error {
-	myAddr = addr
 	return startNewSession(addr)
 }
 
@@ -67,11 +67,13 @@ func startNewSession(addr string) error {
 	if err != nil {
 		return err
 	}
-	myListener, err = net.ListenTCP("tcp", lAddr)
+	myListener, err := net.ListenTCP("tcp", lAddr)
 	if err == nil {
 		fmt.Println("listening on ", lAddr.String())
 		myMeta.Id = uuid.NewV1().String()
 		myMeta.Addr = lAddr.String()
+		myMeta.listener = myListener
+		myMeta.initialized = true
 		go listenForConn(myListener)
 	}
 	return err
@@ -91,7 +93,7 @@ func listenForConn(listener *net.TCPListener) {
 // Disconnect from the network voluntarily
 func Disconnect() {
 	// refuse new incoming connections
-	myListener.Close() // best attemp, error ignored
+	myMeta.listener.Close() // best attemp, error ignored
 	// close all incoming and outgoing connection
 	nodeList := getAllNodes()
 	for _, node := range nodeList {
@@ -107,11 +109,12 @@ func Disconnect() {
 			}
 		}
 	}
+	myMeta.initialized = false
 }
 
 // Reconnect
 func Reconnect() error {
-	err := startNewSession(myAddr)
+	err := startNewSession(myMeta.Addr)
 	if err != nil {
 		return err
 	}
@@ -155,7 +158,6 @@ func handleConn(conn net.Conn) {
 		newNode := Node{msgIn.Addr, false, true, wrapper, nil}
 		putNewNode(&newNode, msgIn.Id)
 		fmt.Printf("received connection: %s(%s)\n",msgIn.Id, msgIn.Addr)
-		// connect to this node
 		connectToHelper(msgIn.Addr)
 	} else {
 		if node.Quitted {
@@ -166,6 +168,7 @@ func handleConn(conn net.Conn) {
 			node.in.conn.Close()
 		}
 		node.in = wrapper
+		fmt.Printf("received connection: %s(%s)\n",msgIn.Id, msgIn.Addr)
 	}
 	handleNewNodes(msgIn.NodeMap)
 	foreverRead(msgIn.Id, wrapper.reader)
@@ -204,6 +207,9 @@ func handleLeave (id string){
 // All the following functions assume an Initialize call has been made
 
 func ConnectTo(remoteAddr string) error {
+	if myMeta.initialized == false && myMeta.Addr != "" {
+		return errors.New("Please call reconnect to re-establish connection.")
+	}
 	return connectToHelper(remoteAddr)
 }
 
