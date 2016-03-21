@@ -41,10 +41,10 @@ type ConnWrapper struct {
 }
 
 type NodeMetaData struct {
-	sync.Mutex
-	Id      string
-	Addr    string
-	NodeMap map[string]*Node
+	sync.RWMutex //only for the map
+	Id           string
+	Addr         string
+	NodeMap      map[string]*Node
 }
 
 // message type identifiers
@@ -90,16 +90,21 @@ func Disconnect() {
 	// refuse new incoming connections
 	myListener.Close() // best attemp, error ignored
 	// close all incoming and outgoing connection
-	for _, node := range myMeta.NodeMap {
+	nodeList := getAllNodes()
+	fmt.Println("hello?")
+	for _, node := range nodeList {
 		if !node.Quitted {
 			// close all existing incoming connections
-			node.in.conn.Close()
-			// send disconnection notice
-			err := node.out.writer.WriteMessage2(leaveMsg, make([]byte, 100))
-			handleError(err)
-			// close all outgoing connections
-			node.out.conn.Close()
-			fmt.Println("disconnected --- ", node.Addr)
+			if node.in != nil {
+				node.in.conn.Close()
+			}
+			// send disconnection notice & disconnect
+			if node.out != nil{
+				err := node.out.writer.WriteMessage2(leaveMsg, make([]byte, 100))
+				handleError(err)
+				node.out.conn.Close()
+				fmt.Println("disconnected --- ", node.Addr)
+			}
 		}
 	}
 }
@@ -124,7 +129,7 @@ func newConnWrapper(conn net.Conn) *ConnWrapper {
 
 // handle node joining or rejoining
 func handleConn(conn net.Conn) {
-	// send saved nodeMap to that node, add that node to nodeMap
+	// receive registration information
 	wrapper := newConnWrapper(conn)
 
 	msgInType, m, err := wrapper.reader.ReadMessage2()
@@ -133,35 +138,35 @@ func handleConn(conn net.Conn) {
 		return
 	}
 
-	var msgIn NodeMetaData
-	err = json.Unmarshal(m, &msgIn)
+	msgIn, err := jsonToMeta(m)
 	if err != nil {
 		conn.Close()
 		return
 	}
 
-	fmt.Println("---new-connection---: \n", string(m))
-
-	// TODO there's a potential locking problem here
-	msg, _ := json.Marshal(myMeta)
-	wrapper.writer.WriteMessage2(regMsg, msg)
+	fmt.Println("---receiving-connection---: \n", string(m))
+	// write back registration information
+	replyMsg := metaToJson()
+	wrapper.writer.WriteMessage2(regMsg, replyMsg)
 
 	//add this node to nodeMap
-	myMeta.Lock()
-	node, ok := myMeta.NodeMap[msgIn.Id]
+	node, ok := getNode(msgIn.Id)
 	if !ok {
 		newNode := Node{msgIn.Addr, false, true, wrapper, nil}
-		addNodeToMap(&newNode, msgIn.Id)
+		putNewNode(&newNode, msgIn.Id)
 		// connect to this node
 		connectToHelper(msgIn.Addr)
 	} else {
-		if node.in.conn != nil {
+		if node.Quitted {
 			conn.Close()
+			return
+		}
+		if node.in != nil {
+			node.in.conn.Close()
 		}
 		node.in = wrapper
 	}
 	handleNewNodes(msgIn.NodeMap)
-	myMeta.Unlock()
 	for {
 		continueRead(msgIn.Id, wrapper.reader)
 	}
@@ -172,14 +177,17 @@ func continueRead(id string, msgReader *util.MessageReader) {
 	msgInType, _, err := msgReader.ReadMessage2()
 	handleError(err)
 
+	// handle node disconnection
 	if msgInType == leaveMsg {
-		result, ok := myMeta.NodeMap[id]
-		if ok && result.connected {
-			result.out.conn.Close()
-			result.Quitted = true
-			result.connected = false
-			fmt.Println(myMeta.NodeMap[id].Addr, "-----quitted")
+		node, ok := getNode(id)
+		if ok && node.connected {
+			node.in.conn.Close()
+			node.out.conn.Close()
+			node.Quitted = true
+			node.connected = false
+			fmt.Println(node.Addr, "-----quitted")
 		}
+		return
 	}
 
 }
@@ -187,8 +195,6 @@ func continueRead(id string, msgReader *util.MessageReader) {
 // All the following functions assume an Initialize call has been made
 
 func ConnectTo(remoteAddr string) error {
-	myMeta.Lock()
-	defer myMeta.Unlock()
 	return connectToHelper(remoteAddr)
 }
 
@@ -197,40 +203,69 @@ func connectToHelper(remoteAddr string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("connecting to: ", remoteAddr)
+	fmt.Println("---connecting--to---: \n", remoteAddr)
 	wrapper := newConnWrapper(conn)
 
 	// send registration information
-	msg, _ := json.Marshal(myMeta)
-
+	msg := metaToJson()
 	err = wrapper.writer.WriteMessage2(regMsg, msg)
 	handleError(err)
 
 	// receive registration information
 	msgType, msgBuff, err := wrapper.reader.ReadMessage2()
-	handleError(err)
-	var newNodeData NodeMetaData
-	if msgType == regMsg {
-		json.Unmarshal(msgBuff, &newNodeData)
+	if err != nil || msgType != regMsg {
+		conn.Close()
+		return err
+	}
+	receivedMeta, err := jsonToMeta(msgBuff)
+	if err != nil {
+		conn.Close()
+		return err
 	}
 
 	// for checking
-	fmt.Println("reply type:", msgType)
+	fmt.Println("received reply type:", msgType)
 
-	// save new node to map
-	var newNode Node
-	newNode.Addr = newNodeData.Addr
-	newNode.connected = true
-	newNode.out = wrapper
+	//add this node to nodeMap
+	node, ok := getNode(receivedMeta.Id)
+	if !ok {
+		newNode := Node{receivedMeta.Addr, false, true, nil, wrapper}
+		putNewNode(&newNode, receivedMeta.Id)
+	} else {
+		if node.Quitted {
+			conn.Close()
+			return nil
+		}
+		if node.out != nil {
+			node.out.conn.Close()
+		}
+		node.out = wrapper
+	}
+	handleNewNodes(receivedMeta.NodeMap)
 
-	// TODO should check if we already added it before
-	// and adjust accordingly
-	addNodeToMap(&newNode, newNodeData.Id)
-
-	handleNewNodes(newNodeData.NodeMap)
-
-	return err
+	return nil
 }
+
+func Broadcast() {
+
+}
+
+func handleNewNodes(receivedNodeMap map[string]*Node) {
+
+	for key, value := range receivedNodeMap {
+		_, ok := getNode(key)
+		if !ok && key != myMeta.Id {
+			putNewNode(value, key)
+			connectToHelper(value.Addr)
+		}
+	}
+}
+
+func handleError(error error) {
+
+}
+
+// Following functions are wrappers & helpers for accessing network metadata
 
 func GetNetworkMetadata() string {
 	myMeta.Lock()
@@ -239,27 +274,39 @@ func GetNetworkMetadata() string {
 	return string(meta)
 }
 
-func Broadcast() {
-
+func metaToJson() []byte {
+	myMeta.RLock()
+	defer myMeta.RUnlock()
+	meta, _ := json.Marshal(myMeta)
+	return meta
 }
 
-// TODO restructure this
-func addNodeToMap(nodeData *Node, nodeId string) {
+func jsonToMeta(msg []byte) (NodeMetaData, error) {
+	var meta NodeMetaData
+	err := json.Unmarshal(msg, &meta)
+	return meta, err
+}
+
+func putNewNode(nodeData *Node, nodeId string) {
+	myMeta.Lock()
 	myMeta.NodeMap[nodeId] = nodeData
+	myMeta.Unlock()
 }
 
-func handleNewNodes(receivedNodeMap map[string]*Node) {
+func getNode(nodeId string) (*Node, bool) {
+	myMeta.RLock()
+	result, ok := myMeta.NodeMap[nodeId]
+	myMeta.RUnlock()
+	return result, ok
+}
 
-	for key, value := range receivedNodeMap {
-		_, ok := myMeta.NodeMap[key]
-		if !ok && key != myMeta.Id {
-			addNodeToMap(value, key)
-			// TODO: Connect to the added node.
-			connectToHelper(value.Addr)
-		}
+// get a list of nodes of nodeMap
+func getAllNodes() []*Node {
+	myMeta.RLock()
+	defer myMeta.RUnlock()
+	nodeList := make([]*Node, len(myMeta.NodeMap))
+	for _, node := range myMeta.NodeMap {
+		nodeList = append(nodeList, node)
 	}
-}
-
-func handleError(error error) {
-
+	return nodeList
 }
