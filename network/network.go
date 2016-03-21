@@ -13,11 +13,11 @@ import (
 	"../util"
 	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/satori/go.uuid"
 	"net"
 	"sync"
-	"errors"
 )
 
 // data structures
@@ -63,6 +63,9 @@ func Initialize(addr string) error {
 }
 
 func startNewSession(addr string) error {
+	if myMeta.initialized {
+		return nil
+	}
 	lAddr, err := net.ResolveTCPAddr("tcp", addr)
 	if err != nil {
 		return err
@@ -101,11 +104,11 @@ func Disconnect() {
 			// close all existing incoming connections
 			node.closeInConn()
 			// send disconnection notice & disconnect
-			if node.out != nil{
+			if node.out != nil {
 				err := node.out.writer.WriteMessage2(leaveMsg, make([]byte, 100))
 				handleError(err)
 				node.out.conn.Close()
-				fmt.Printf("disconnect from: %s\n",node.Addr)
+				fmt.Printf("disconnect from: %s\n", node.Addr)
 			}
 		}
 	}
@@ -114,12 +117,29 @@ func Disconnect() {
 
 // Reconnect
 func Reconnect() error {
+	if myMeta.initialized == true {
+		return errors.New("No reconnection needed.")
+	}
 	err := startNewSession(myMeta.Addr)
 	if err != nil {
 		return err
 	}
-	// TODO connect to all previously known nodes
-	return err
+	// connect to all previously known nodes
+	connectKnownNodes()
+	return nil
+}
+
+func connectKnownNodes() {
+	nodeList := getAllNodes()
+	for _, node := range nodeList {
+		if !node.Quitted {
+			err := connectToHelper(node.Addr)
+			// TODO: handle connection error here
+			if err != nil {
+
+			}
+		}
+	}
 }
 
 // get a new ConnWrapper around a connection
@@ -147,7 +167,6 @@ func handleConn(conn net.Conn) {
 		return
 	}
 
-//	fmt.Println("receiving connection: ", string(m))
 	// write back registration information
 	replyMsg := metaToJson()
 	wrapper.writer.WriteMessage2(regMsg, replyMsg)
@@ -157,20 +176,22 @@ func handleConn(conn net.Conn) {
 	if !ok {
 		newNode := Node{msgIn.Addr, false, true, wrapper, nil}
 		putNewNode(&newNode, msgIn.Id)
-		fmt.Printf("received connection: %s(%s)\n",msgIn.Id, msgIn.Addr)
+		fmt.Printf("received connection: %s(%s)\n", msgIn.Id, msgIn.Addr)
 		connectToHelper(msgIn.Addr)
 	} else {
 		if node.Quitted {
 			conn.Close()
+			node.closeInConn()
+			node.closeOutConn()
 			return
 		}
-		if node.in != nil {
-			node.in.conn.Close()
-		}
+		node.closeInConn()
 		node.in = wrapper
-		fmt.Printf("received connection: %s(%s)\n",msgIn.Id, msgIn.Addr)
+		node.connected = true
+		fmt.Printf("received connection: %s(%s)\n", msgIn.Id, msgIn.Addr)
 	}
 	handleNewNodes(msgIn.NodeMap)
+	//broadcastToPeer(newNodeMsg)
 	foreverRead(msgIn.Id, wrapper.reader)
 }
 
@@ -193,9 +214,9 @@ func foreverRead(id string, msgReader *util.MessageReader) {
 
 }
 
-func handleLeave (id string){
+func handleLeave(id string) {
 	node, ok := getNode(id)
-	if ok && node.connected {
+	if ok {
 		node.closeInConn()
 		node.closeOutConn()
 		node.Quitted = true
@@ -207,10 +228,24 @@ func handleLeave (id string){
 // All the following functions assume an Initialize call has been made
 
 func ConnectTo(remoteAddr string) error {
-	if myMeta.initialized == false && myMeta.Addr != "" {
-		return errors.New("Please call reconnect to re-establish connection.")
+	if myMeta.initialized == false {
+		err := Reconnect()
+		if err != nil {
+			return err
+		}
 	}
+
+	if myMeta.Addr == remoteAddr {
+		return errors.New("Please enter an address that's different from your local address.")
+	}
+
+	// TODO : fix possible connect to an address twice problem maybe by reordering method call
 	return connectToHelper(remoteAddr)
+}
+
+// TODO: possible refactoring?
+func startConnection(remoteAddr string, nodeId string) {
+
 }
 
 func connectToHelper(remoteAddr string) error {
@@ -218,7 +253,7 @@ func connectToHelper(remoteAddr string) error {
 	if err != nil {
 		return err
 	}
-//	fmt.Println("connecting to:", remoteAddr)
+	//	fmt.Println("connecting to:", remoteAddr)
 	wrapper := newConnWrapper(conn)
 
 	// send registration information
@@ -249,15 +284,16 @@ func connectToHelper(remoteAddr string) error {
 	} else {
 		if node.Quitted {
 			conn.Close()
+			node.closeInConn()
+			node.closeOutConn()
 			return nil
 		}
-		if node.out != nil {
-			node.out.conn.Close()
-		}
+		node.closeOutConn()
 		node.out = wrapper
+		node.connected = true
 	}
-	fmt.Printf("dialed connection: %s(%s)\n",receivedMeta.Id, receivedMeta.Addr)
-	handleNewNodes(receivedMeta.NodeMap)
+	fmt.Printf("dialed connection: %s(%s)\n", receivedMeta.Id, receivedMeta.Addr)
+	//	handleNewNodes(receivedMeta.NodeMap)
 
 	return nil
 }
@@ -269,10 +305,16 @@ func Broadcast() {
 func handleNewNodes(receivedNodeMap map[string]*Node) {
 
 	for key, value := range receivedNodeMap {
-		_, ok := getNode(key)
-		if !ok && key != myMeta.Id {
+		node, ok := getNode(key)
+		if !ok && key != myMeta.Id && value.Addr != myMeta.Addr {
 			putNewNode(value, key)
-			connectToHelper(value.Addr)
+			if !value.Quitted {
+				connectToHelper(value.Addr)
+			}
+		}
+
+		if ok && value.Quitted && !node.Quitted {
+			handleLeave(key)
 		}
 	}
 }
@@ -284,13 +326,20 @@ func handleError(error error) {
 func (node *Node) closeInConn() {
 	if node.in != nil {
 		node.in.conn.Close()
+		node.in = nil
 	}
 }
 
 func (node *Node) closeOutConn() {
 	if node.out != nil {
 		node.out.conn.Close()
+		node.out = nil
 	}
+}
+
+func (node *Node) closeAllConn() {
+	node.closeInConn()
+	node.closeOutConn()
 }
 
 // Following functions are wrappers & helpers for accessing network metadata
