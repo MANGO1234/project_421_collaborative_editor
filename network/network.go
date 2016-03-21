@@ -80,7 +80,10 @@ func startNewSession(addr string) error {
 // listen for incoming connection to register
 func listenForConn(listener *net.TCPListener) {
 	for {
-		conn, _ := listener.Accept()
+		conn, err := listener.Accept()
+		if err != nil {
+			return
+		}
 		go handleConn(conn)
 	}
 }
@@ -91,13 +94,11 @@ func Disconnect() {
 	myListener.Close() // best attemp, error ignored
 	// close all incoming and outgoing connection
 	nodeList := getAllNodes()
-	fmt.Println("hello?")
+	fmt.Println(nodeList)
 	for _, node := range nodeList {
 		if !node.Quitted {
 			// close all existing incoming connections
-			if node.in != nil {
-				node.in.conn.Close()
-			}
+			node.closeInConn()
 			// send disconnection notice & disconnect
 			if node.out != nil{
 				err := node.out.writer.WriteMessage2(leaveMsg, make([]byte, 100))
@@ -144,7 +145,7 @@ func handleConn(conn net.Conn) {
 		return
 	}
 
-	fmt.Println("---receiving-connection---: \n", string(m))
+	fmt.Println("receiving-connection---: ", string(m))
 	// write back registration information
 	replyMsg := metaToJson()
 	wrapper.writer.WriteMessage2(regMsg, replyMsg)
@@ -167,29 +168,37 @@ func handleConn(conn net.Conn) {
 		node.in = wrapper
 	}
 	handleNewNodes(msgIn.NodeMap)
-	for {
-		continueRead(msgIn.Id, wrapper.reader)
-	}
+	foreverRead(msgIn.Id, wrapper.reader)
 }
 
-func continueRead(id string, msgReader *util.MessageReader) {
-	//
-	msgInType, _, err := msgReader.ReadMessage2()
-	handleError(err)
-
-	// handle node disconnection
-	if msgInType == leaveMsg {
-		node, ok := getNode(id)
-		if ok && node.connected {
-			node.in.conn.Close()
-			node.out.conn.Close()
-			node.Quitted = true
-			node.connected = false
-			fmt.Println(node.Addr, "-----quitted")
+func foreverRead(id string, msgReader *util.MessageReader) {
+	for {
+		msgInType, _, err := msgReader.ReadMessage2()
+		if err != nil {
+			handleError(err)
+			return
 		}
-		return
+		switch msgInType {
+		case leaveMsg:
+			handleLeave(id)
+			return
+		default:
+			return
+		}
+
 	}
 
+}
+
+func handleLeave (id string){
+	node, ok := getNode(id)
+	if ok && node.connected {
+		node.in.conn.Close()
+		node.out.conn.Close()
+		node.Quitted = true
+		node.connected = false
+		fmt.Println(node.Addr, "-----quitted")
+	}
 }
 
 // All the following functions assume an Initialize call has been made
@@ -265,6 +274,18 @@ func handleError(error error) {
 
 }
 
+func (node *Node) closeInConn() {
+	if node.in != nil {
+		node.in.conn.Close()
+	}
+}
+
+func (node *Node) closeOutConn() {
+	if node.out != nil {
+		node.out.conn.Close()
+	}
+}
+
 // Following functions are wrappers & helpers for accessing network metadata
 
 func GetNetworkMetadata() string {
@@ -304,9 +325,12 @@ func getNode(nodeId string) (*Node, bool) {
 func getAllNodes() []*Node {
 	myMeta.RLock()
 	defer myMeta.RUnlock()
-	nodeList := make([]*Node, len(myMeta.NodeMap))
+	n := len(myMeta.NodeMap)
+	nodeList := make([]*Node, n)
+	i := 0
 	for _, node := range myMeta.NodeMap {
-		nodeList = append(nodeList, node)
+		nodeList[i] = node
+		i++
 	}
 	return nodeList
 }
