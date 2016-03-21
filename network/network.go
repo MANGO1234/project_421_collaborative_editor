@@ -94,7 +94,6 @@ func Disconnect() {
 	myListener.Close() // best attemp, error ignored
 	// close all incoming and outgoing connection
 	nodeList := getAllNodes()
-	fmt.Println(nodeList)
 	for _, node := range nodeList {
 		if !node.Quitted {
 			// close all existing incoming connections
@@ -104,7 +103,7 @@ func Disconnect() {
 				err := node.out.writer.WriteMessage2(leaveMsg, make([]byte, 100))
 				handleError(err)
 				node.out.conn.Close()
-				fmt.Println("disconnected --- ", node.Addr)
+				fmt.Printf("disconnect from: %s\n",node.Addr)
 			}
 		}
 	}
@@ -145,7 +144,7 @@ func handleConn(conn net.Conn) {
 		return
 	}
 
-	fmt.Println("receiving-connection---: ", string(m))
+//	fmt.Println("receiving connection: ", string(m))
 	// write back registration information
 	replyMsg := metaToJson()
 	wrapper.writer.WriteMessage2(regMsg, replyMsg)
@@ -155,6 +154,7 @@ func handleConn(conn net.Conn) {
 	if !ok {
 		newNode := Node{msgIn.Addr, false, true, wrapper, nil}
 		putNewNode(&newNode, msgIn.Id)
+		fmt.Printf("received connection: %s(%s)\n",msgIn.Id, msgIn.Addr)
 		// connect to this node
 		connectToHelper(msgIn.Addr)
 	} else {
@@ -193,11 +193,11 @@ func foreverRead(id string, msgReader *util.MessageReader) {
 func handleLeave (id string){
 	node, ok := getNode(id)
 	if ok && node.connected {
-		node.in.conn.Close()
-		node.out.conn.Close()
+		node.closeInConn()
+		node.closeOutConn()
 		node.Quitted = true
 		node.connected = false
-		fmt.Println(node.Addr, "-----quitted")
+		fmt.Printf("node quitted: %s(%s)\n", id, node.Addr)
 	}
 }
 
@@ -212,13 +212,16 @@ func connectToHelper(remoteAddr string) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("---connecting--to---: \n", remoteAddr)
+//	fmt.Println("connecting to:", remoteAddr)
 	wrapper := newConnWrapper(conn)
 
 	// send registration information
 	msg := metaToJson()
 	err = wrapper.writer.WriteMessage2(regMsg, msg)
-	handleError(err)
+	if err != nil {
+		conn.Close()
+		return err
+	}
 
 	// receive registration information
 	msgType, msgBuff, err := wrapper.reader.ReadMessage2()
@@ -231,9 +234,6 @@ func connectToHelper(remoteAddr string) error {
 		conn.Close()
 		return err
 	}
-
-	// for checking
-	fmt.Println("received reply type:", msgType)
 
 	//add this node to nodeMap
 	node, ok := getNode(receivedMeta.Id)
@@ -250,6 +250,7 @@ func connectToHelper(remoteAddr string) error {
 		}
 		node.out = wrapper
 	}
+	fmt.Printf("dialed connection: %s(%s)\n",receivedMeta.Id, receivedMeta.Addr)
 	handleNewNodes(receivedMeta.NodeMap)
 
 	return nil
