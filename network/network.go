@@ -31,8 +31,8 @@ type Node struct {
 
 	// fields below are for internal operations
 	connected bool
-	in        *ConnWrapper
-	out       *ConnWrapper
+	in  *ConnWrapper
+	out *ConnWrapper
 }
 
 type ConnWrapper struct {
@@ -50,9 +50,15 @@ type NodeMetaData struct {
 	initialized  bool
 }
 
+type NodeMetaDataUpdate struct {
+	NodeMeta     NodeMetaData
+	VisitedNodes map[string]bool
+}
+
 // message type identifiers
 const regMsg string = "registration"
 const leaveMsg string = "disconnection"
+const metaUpdateMsg string = "metaUpdate"
 
 // global variables
 var myMeta NodeMetaData = NodeMetaData{NodeMap: make(map[string]*Node)} // keeps track of my NodeMetaData
@@ -67,9 +73,6 @@ func startNewSession(addr string) error {
 		return nil
 	}
 	lAddr, err := net.ResolveTCPAddr("tcp", addr)
-	if err != nil {
-		return err
-	}
 	myListener, err := net.ListenTCP("tcp", lAddr)
 	if err == nil {
 		fmt.Println("listening on ", lAddr.String())
@@ -86,10 +89,9 @@ func startNewSession(addr string) error {
 func listenForConn(listener *net.TCPListener) {
 	for {
 		conn, err := listener.Accept()
-		if err != nil {
-			return
+		if err == nil {
+			go handleConn(conn)
 		}
-		go handleConn(conn)
 	}
 }
 
@@ -107,7 +109,7 @@ func Disconnect() {
 			if node.out != nil {
 				err := node.out.writer.WriteMessage2(leaveMsg, make([]byte, 100))
 				handleError(err)
-				node.out.conn.Close()
+				node.closeOutConn()
 				fmt.Printf("disconnect from: %s\n", node.Addr)
 			}
 		}
@@ -115,18 +117,17 @@ func Disconnect() {
 	myMeta.initialized = false
 }
 
-// Reconnect
+// Re-initialize node with new UUID.
 func Reconnect() error {
 	if myMeta.initialized == true {
-		return errors.New("No reconnection needed.")
+		return errors.New("Please use reconnect only after you disconnect.")
 	}
 	err := startNewSession(myMeta.Addr)
-	if err != nil {
-		return err
+	if err == nil {
+		// connect to all previously known nodes
+		connectKnownNodes()
 	}
-	// connect to all previously known nodes
-	connectKnownNodes()
-	return nil
+	return err
 }
 
 func connectKnownNodes() {
@@ -136,7 +137,6 @@ func connectKnownNodes() {
 			err := connectToHelper(node.Addr)
 			// TODO: handle connection error here
 			if err != nil {
-
 			}
 		}
 	}
@@ -190,14 +190,21 @@ func handleConn(conn net.Conn) {
 		node.connected = true
 		fmt.Printf("received connection: %s(%s)\n", msgIn.Id, msgIn.Addr)
 	}
-	handleNewNodes(msgIn.NodeMap)
-	//broadcastToPeer(newNodeMsg)
+	changed, visitedNodes := handleNodesMap(msgIn.NodeMap)
+	visitedNodes[msgIn.Id] = true
+	visitedNodes[myMeta.Id] = true
+
+	// broadcast new nodeMap to peers only if current call has resulted change in current nodeMap
+	if changed || !ok {
+		broadcastToPeer(visitedNodes)
+	}
 	foreverRead(msgIn.Id, wrapper.reader)
 }
 
+// handle
 func foreverRead(id string, msgReader *util.MessageReader) {
 	for {
-		msgInType, _, err := msgReader.ReadMessage2()
+		msgInType, msg, err := msgReader.ReadMessage2()
 		if err != nil {
 			handleError(err)
 			return
@@ -206,12 +213,29 @@ func foreverRead(id string, msgReader *util.MessageReader) {
 		case leaveMsg:
 			handleLeave(id)
 			return
+		case metaUpdateMsg:
+			receivedUpdate, err := JsonToMetaUpdate(msg)
+			if err != nil {
+				handleMetaUpdate(receivedUpdate)
+				return
+			}
 		default:
 			return
 		}
 
 	}
 
+}
+
+func handleMetaUpdate(receivedUpdate NodeMetaDataUpdate) {
+	changed, contactedNodes := handleNodesMap(receivedUpdate.NodeMeta.NodeMap)
+	if changed {
+		for key, _ := range receivedUpdate.VisitedNodes {
+			contactedNodes[key] = true
+		}
+		contactedNodes[myMeta.Id] = true
+		broadcastToPeer(contactedNodes)
+	}
 }
 
 func handleLeave(id string) {
@@ -223,6 +247,11 @@ func handleLeave(id string) {
 		node.connected = false
 		fmt.Printf("node quitted: %s(%s)\n", id, node.Addr)
 	}
+	visitedNodes := make(map[string]bool)
+	visitedNodes[id] = true
+	visitedNodes[myMeta.Id] =  true
+
+	broadcastToPeer(visitedNodes)
 }
 
 // All the following functions assume an Initialize call has been made
@@ -293,7 +322,7 @@ func connectToHelper(remoteAddr string) error {
 		node.connected = true
 	}
 	fmt.Printf("dialed connection: %s(%s)\n", receivedMeta.Id, receivedMeta.Addr)
-	//	handleNewNodes(receivedMeta.NodeMap)
+	//	handleNodesMap(receivedMeta.NodeMap)
 
 	return nil
 }
@@ -302,7 +331,24 @@ func Broadcast() {
 
 }
 
-func handleNewNodes(receivedNodeMap map[string]*Node) {
+// broadcast current node meta data to all peers except for those who have been contacted already
+func broadcastToPeer(visitedNodes map[string]bool) {
+	nodeMap := getNodeMap()
+	metaUpdate := getMetaUpdateJson(visitedNodes)
+	for id, node := range nodeMap {
+		if !node.Quitted && !visitedNodes[id] {
+			node.sendMsg(metaUpdateMsg, metaUpdate)
+			fmt.Println("broadcasted change to " + node.Addr)
+		}
+	}
+}
+
+// handle received nodeMap appropriately
+// return a bool indicating if receivedNodeMap has caused any change to current metadata
+// return a list of nodeIds being contacted during this process
+func handleNodesMap(receivedNodeMap map[string]*Node) (bool, map[string]bool) {
+	var changed bool
+	contactedNodes := make(map[string]bool)
 
 	for key, value := range receivedNodeMap {
 		node, ok := getNode(key)
@@ -310,13 +356,18 @@ func handleNewNodes(receivedNodeMap map[string]*Node) {
 			putNewNode(value, key)
 			if !value.Quitted {
 				connectToHelper(value.Addr)
+				contactedNodes[key] = true
 			}
+			changed = true
 		}
 
 		if ok && value.Quitted && !node.Quitted {
 			handleLeave(key)
+			changed = true
 		}
 	}
+
+	return changed, contactedNodes
 }
 
 func handleError(error error) {
@@ -340,6 +391,13 @@ func (node *Node) closeOutConn() {
 func (node *Node) closeAllConn() {
 	node.closeInConn()
 	node.closeOutConn()
+}
+
+func (node *Node) sendMsg(msgType string, msg []byte) error {
+	if node.out != nil {
+		return node.out.writer.WriteMessage2(msgType, msg)
+	}
+	return errors.New("No out connection available.")
 }
 
 // Following functions are wrappers & helpers for accessing network metadata
@@ -389,4 +447,30 @@ func getAllNodes() []*Node {
 		i++
 	}
 	return nodeList
+}
+
+// get a copy of nodeMap
+func getNodeMap() map[string]*Node {
+	myMeta.RLock()
+	defer myMeta.RUnlock()
+	mapCopy := make(map[string]*Node)
+	for key, value := range myMeta.NodeMap {
+		mapCopy[key] = value
+	}
+
+	return mapCopy
+}
+
+func getMetaUpdateJson(visitedNodes map[string]bool) []byte {
+	myMeta.RLock()
+	defer myMeta.RUnlock()
+	newMetaUpdate := NodeMetaDataUpdate{myMeta, visitedNodes}
+	metaUpdate, _ := json.Marshal(newMetaUpdate)
+	return metaUpdate
+}
+
+func JsonToMetaUpdate(message []byte) (NodeMetaDataUpdate, error) {
+	var metaUpdate NodeMetaDataUpdate
+	err := json.Unmarshal(message, &metaUpdate)
+	return metaUpdate, err
 }
