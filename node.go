@@ -22,7 +22,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	err := network.Initialize(os.Args[1])
+	nodeId, err := network.Initialize(os.Args[1])
+	mydoc := treedoc.GenerateDoc([]treedoc.Dir{
+		treedoc.Dir{[]byte(nodeId), false}}, "")
+	currentPos := []treedoc.Dir{treedoc.Dir{[]byte(nodeId), false}}
+
 	util.CheckError(err)
 
 	// TODO initialize treedoc
@@ -48,20 +52,36 @@ func main() {
 		case "insert":
 			fmt.Print("insert > ")
 			scanner.Scan()
-			pos := scanner.Text()
-			fmt.Print("insert " + pos + " > ")
-			scanner.Scan()
-			//string := scanner.Text()
+			/*
+				pos := scanner.Text()
+				fmt.Print("insert " + pos + " > ")
+				scanner.Scan()
+			*/
+			txtInsert := scanner.Text()
+			if len(txtInsert) <= 1 {
+				treedoc.Insert(mydoc, currentPos, txtInsert[0])
+			} else {
+				tempDoc := treedoc.GenerateDoc(currentPos, txtInsert)
+				treedoc.Merge(mydoc, tempDoc)
+			}
+
+			fmt.Println(treedoc.DocToString(mydoc))
+
 			// TODO: parse and insert
+			//err = network.BroadCastInsert()
 			// new line must be escaped on the client side
 		case "delete":
 			fmt.Print("delete > ")
 			scanner.Scan()
 			pos := scanner.Text()
 			fmt.Print("delete " + pos + " > ")
-			scanner.Scan()
+
+			treedoc.Delete(mydoc, currentPos)
+			fmt.Println(treedoc.DocToString(mydoc))
+
 			//length := scanner.Text()
 			// TODO: delete length characters at pos
+			//err = network.BroadCastDelete()
 		case "exportDoc":
 			fmt.Print("exportDoc > ")
 			scanner.Scan()
@@ -69,6 +89,7 @@ func main() {
 			// TODO: export the current doc into path
 		case "printDoc":
 			// TODO: print current doc
+			fmt.Println(treedoc.DocToString(mydoc))
 		case "printNetMeta":
 			fmt.Println(network.GetNetworkMetadata())
 		case "help":

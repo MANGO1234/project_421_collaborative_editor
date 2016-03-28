@@ -31,8 +31,8 @@ type Node struct {
 
 	// fields below are for internal operations
 	connected bool
-	in  *ConnWrapper
-	out *ConnWrapper
+	in        *ConnWrapper
+	out       *ConnWrapper
 }
 
 type ConnWrapper struct {
@@ -64,25 +64,26 @@ const metaUpdateMsg string = "metaUpdate"
 var myMeta NodeMetaData = NodeMetaData{NodeMap: make(map[string]*Node)} // keeps track of my NodeMetaData
 
 // initialize local network listener
-func Initialize(addr string) error {
+func Initialize(addr string) (id string, err error) {
 	return startNewSession(addr)
 }
 
-func startNewSession(addr string) error {
+func startNewSession(addr string) (id string, err error) {
 	if myMeta.initialized {
-		return nil
+		return
 	}
 	lAddr, err := net.ResolveTCPAddr("tcp", addr)
 	myListener, err := net.ListenTCP("tcp", lAddr)
 	if err == nil {
 		fmt.Println("listening on ", lAddr.String())
 		myMeta.Id = uuid.NewV1().String()
+		id = myMeta.Id
 		myMeta.Addr = lAddr.String()
 		myMeta.listener = myListener
 		myMeta.initialized = true
 		go listenForConn(myListener)
 	}
-	return err
+	return
 }
 
 // listen for incoming connection to register
@@ -122,7 +123,7 @@ func Reconnect() error {
 	if myMeta.initialized == true {
 		return errors.New("Please use reconnect only after you disconnect.")
 	}
-	err := startNewSession(myMeta.Addr)
+	_, err := startNewSession(myMeta.Addr)
 	if err == nil {
 		// connect to all previously known nodes
 		connectKnownNodes()
@@ -249,7 +250,7 @@ func handleLeave(id string) {
 	}
 	visitedNodes := make(map[string]bool)
 	visitedNodes[id] = true
-	visitedNodes[myMeta.Id] =  true
+	visitedNodes[myMeta.Id] = true
 
 	broadcastToPeer(visitedNodes)
 }
