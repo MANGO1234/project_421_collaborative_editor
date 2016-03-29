@@ -198,7 +198,7 @@ func handleConn(conn net.Conn) {
 
 	// broadcast new nodeMap to peers only if current call has resulted change in current nodeMap
 	if changed || !ok {
-		 broadcastToPeer(visitedNodes)
+		broadcastToPeer(visitedNodes)
 	}
 	foreverRead(msgIn.Id, wrapper.reader)
 }
@@ -217,10 +217,9 @@ func foreverRead(id string, msgReader *util.MessageReader) {
 			return
 		case metaUpdateMsg:
 			receivedUpdate, err := JsonToMetaUpdate(msg)
-			fmt.Println("-----received MetaUpdate Message from",  receivedUpdate.NodeMeta.Addr)
+			fmt.Println("-----received MetaUpdate Message from", receivedUpdate.NodeMeta.Addr)
 			if err == nil {
 				handleMetaUpdate(receivedUpdate)
-				return
 			}
 		default:
 			return
@@ -369,7 +368,7 @@ func handleNodesMap(receivedNodeMap map[string]*Node) (bool, map[string]bool) {
 		if ok && value.Quitted && !node.Quitted {
 			handleLeave(key)
 			changed = true
-		}else if ok {
+		} else if ok {
 			contactedNodes[key] = true
 		}
 	}
