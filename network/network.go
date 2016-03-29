@@ -192,12 +192,13 @@ func handleConn(conn net.Conn) {
 		fmt.Printf("received connection: %s(%s)\n", msgIn.Id, msgIn.Addr)
 	}
 	changed, visitedNodes := handleNodesMap(msgIn.NodeMap)
+
 	visitedNodes[msgIn.Id] = true
 	visitedNodes[myMeta.Id] = true
 
 	// broadcast new nodeMap to peers only if current call has resulted change in current nodeMap
 	if changed || !ok {
-		broadcastToPeer(visitedNodes)
+		 broadcastToPeer(visitedNodes)
 	}
 	foreverRead(msgIn.Id, wrapper.reader)
 }
@@ -216,7 +217,8 @@ func foreverRead(id string, msgReader *util.MessageReader) {
 			return
 		case metaUpdateMsg:
 			receivedUpdate, err := JsonToMetaUpdate(msg)
-			if err != nil {
+			fmt.Println("-----received MetaUpdate Message from",  receivedUpdate.NodeMeta.Addr)
+			if err == nil {
 				handleMetaUpdate(receivedUpdate)
 				return
 			}
@@ -337,7 +339,8 @@ func broadcastToPeer(visitedNodes map[string]bool) {
 	nodeMap := getNodeMap()
 	metaUpdate := getMetaUpdateJson(visitedNodes)
 	for id, node := range nodeMap {
-		if !node.Quitted && !visitedNodes[id] {
+		_, ok := visitedNodes[id]
+		if !node.Quitted && !ok {
 			node.sendMsg(metaUpdateMsg, metaUpdate)
 			fmt.Println("broadcasted change to " + node.Addr)
 		}
@@ -353,6 +356,7 @@ func handleNodesMap(receivedNodeMap map[string]*Node) (bool, map[string]bool) {
 
 	for key, value := range receivedNodeMap {
 		node, ok := getNode(key)
+		contactedNodes[key] = false
 		if !ok && key != myMeta.Id && value.Addr != myMeta.Addr {
 			putNewNode(value, key)
 			if !value.Quitted {
@@ -365,6 +369,8 @@ func handleNodesMap(receivedNodeMap map[string]*Node) (bool, map[string]bool) {
 		if ok && value.Quitted && !node.Quitted {
 			handleLeave(key)
 			changed = true
+		}else if ok {
+			contactedNodes[key] = true
 		}
 	}
 
