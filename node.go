@@ -8,11 +8,12 @@ package main
 
 import (
 	"./network"
-	"./treedoc"
+	// "./treedoc"
 	"./util"
 	"bufio"
 	"fmt"
 	"os"
+	"./treedocmanager"
 )
 
 func main() {
@@ -23,9 +24,9 @@ func main() {
 	}
 
 	nodeId, err := network.Initialize(os.Args[1])
-	err = treedocmanager.createTreedoc(nodeId)
+	treedocmanager.CreateTreedoc(nodeId)
 	// TODO: link cursor position and treedoc posID
-	currentPos := treedocmanager.getCurrentPos()
+
 
 	util.CheckError(err)
 
@@ -54,27 +55,27 @@ func main() {
 				fmt.Print("insert " + pos + " > ")
 				scanner.Scan()
 			*/
-			txtInsert := scanner.Text()
-			if len(txtInsert) <= 1 {
-				treedoc.Insert(mydoc, currentPos, txtInsert[0])
-			} else {
-				tempDoc := treedoc.GenerateDoc(currentPos, txtInsert)
-				treedoc.Merge(mydoc, tempDoc)
-			}
+			// txtInsert := scanner.Text()
+			// if len(txtInsert) <= 1 {
+			// 	treedoc.Insert(mydoc, currentPos, txtInsert[0])
+			// } else {
+			// 	tempDoc := treedoc.GenerateDoc(currentPos, txtInsert)
+			// 	treedoc.Merge(mydoc, tempDoc)
+			// }
 
-			fmt.Println(treedoc.DocToString(mydoc))
+			// fmt.Println(treedoc.DocToString(mydoc))
 
 			// TODO: parse and insert
 			//err = network.BroadCastInsert()
 			// new line must be escaped on the client side
 		case "delete":
-			fmt.Print("delete > ")
-			scanner.Scan()
-			pos := scanner.Text()
-			fmt.Print("delete " + pos + " > ")
+			// fmt.Print("delete > ")
+			// scanner.Scan()
+			// pos := scanner.Text()
+			// fmt.Print("delete " + pos + " > ")
 
-			treedoc.Delete(mydoc, currentPos)
-			fmt.Println(treedoc.DocToString(mydoc))
+			// treedoc.Delete(mydoc, currentPos)
+			// fmt.Println(treedoc.DocToString(mydoc))
 
 			//length := scanner.Text()
 			// TODO: delete length characters at pos
@@ -86,7 +87,7 @@ func main() {
 			// TODO: export the current doc into path
 		case "printDoc":
 			// TODO: print current doc
-			fmt.Println(treedoc.DocToString(mydoc))
+			//fmt.Println(treedoc.DocToString(mydoc))
 		case "printNetMeta":
 			fmt.Println(network.GetNetworkMetadata())
 		case "help":
