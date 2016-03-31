@@ -101,7 +101,7 @@ func Disconnect() {
 	// refuse new incoming connections
 	myMeta.listener.Close() // best attemp, error ignored
 	// close all incoming and outgoing connection
-	nodeList := getAllNodes()
+	nodeList := myMeta.getAllNodes()
 	for _, node := range nodeList {
 		if !node.Quitted {
 			// close all existing incoming connections
@@ -132,7 +132,7 @@ func Reconnect() error {
 }
 
 func connectKnownNodes() {
-	nodeList := getAllNodes()
+	nodeList := myMeta.getAllNodes()
 	for _, node := range nodeList {
 		if !node.Quitted {
 			err := connectToHelper(node.Addr)
@@ -169,14 +169,14 @@ func handleConn(conn net.Conn) {
 	}
 
 	// write back registration information
-	replyMsg := metaToJson()
+	replyMsg := myMeta.toJson()
 	wrapper.writer.WriteMessage2(regMsg, replyMsg)
 
 	//add this node to nodeMap
-	node, ok := getNode(msgIn.Id)
+	node, ok := myMeta.getNode(msgIn.Id)
 	if !ok {
 		newNode := Node{msgIn.Addr, false, true, wrapper, nil}
-		putNewNode(&newNode, msgIn.Id)
+		myMeta.putNewNode(&newNode, msgIn.Id)
 		fmt.Printf("received connection: %s(%s)\n", msgIn.Id, msgIn.Addr)
 		connectToHelper(msgIn.Addr)
 	} else {
@@ -241,7 +241,7 @@ func handleMetaUpdate(receivedUpdate NodeMetaDataUpdate) {
 }
 
 func handleLeave(id string) {
-	node, ok := getNode(id)
+	node, ok := myMeta.getNode(id)
 	if ok {
 		node.closeInConn()
 		node.closeOutConn()
@@ -288,7 +288,7 @@ func connectToHelper(remoteAddr string) error {
 	wrapper := newConnWrapper(conn)
 
 	// send registration information
-	msg := metaToJson()
+	msg := myMeta.toJson()
 	err = wrapper.writer.WriteMessage2(regMsg, msg)
 	if err != nil {
 		conn.Close()
@@ -308,10 +308,10 @@ func connectToHelper(remoteAddr string) error {
 	}
 
 	//add this node to nodeMap
-	node, ok := getNode(receivedMeta.Id)
+	node, ok := myMeta.getNode(receivedMeta.Id)
 	if !ok {
 		newNode := Node{receivedMeta.Addr, false, true, nil, wrapper}
-		putNewNode(&newNode, receivedMeta.Id)
+		myMeta.putNewNode(&newNode, receivedMeta.Id)
 	} else {
 		if node.Quitted {
 			conn.Close()
@@ -333,10 +333,14 @@ func Broadcast() {
 
 }
 
+func GetNetworkMetadata() string {
+	return string(myMeta.toJson())
+}
+
 // broadcast current node meta data to all peers except for those who have been contacted already
 func broadcastToPeer(visitedNodes map[string]bool) {
-	nodeMap := getNodeMap()
-	metaUpdate := getMetaUpdateJson(visitedNodes)
+	nodeMap := myMeta.getNodeMap()
+	metaUpdate := myMeta.getMetaUpdateJson(visitedNodes)
 	for id, node := range nodeMap {
 		_, ok := visitedNodes[id]
 		if !node.Quitted && !ok {
@@ -354,10 +358,10 @@ func handleNodesMap(receivedNodeMap map[string]*Node) (bool, map[string]bool) {
 	contactedNodes := make(map[string]bool)
 
 	for key, value := range receivedNodeMap {
-		node, ok := getNode(key)
+		node, ok := myMeta.getNode(key)
 		contactedNodes[key] = false
 		if !ok && key != myMeta.Id && value.Addr != myMeta.Addr {
-			putNewNode(value, key)
+			myMeta.putNewNode(value, key)
 			if !value.Quitted {
 				connectToHelper(value.Addr)
 				contactedNodes[key] = true
@@ -408,18 +412,11 @@ func (node *Node) sendMsg(msgType string, msg []byte) error {
 
 // Following functions are wrappers & helpers for accessing network metadata
 
-func GetNetworkMetadata() string {
-	myMeta.Lock()
-	defer myMeta.Unlock()
-	meta, _ := json.Marshal(myMeta)
-	return string(meta)
-}
-
-func metaToJson() []byte {
-	myMeta.RLock()
-	defer myMeta.RUnlock()
-	meta, _ := json.Marshal(myMeta)
-	return meta
+func (meta *NodeMetaData) toJson() []byte {
+	meta.RLock()
+	defer meta.RUnlock()
+	metaJson, _ := json.Marshal(meta)
+	return metaJson
 }
 
 func jsonToMeta(msg []byte) (NodeMetaData, error) {
@@ -428,27 +425,27 @@ func jsonToMeta(msg []byte) (NodeMetaData, error) {
 	return meta, err
 }
 
-func putNewNode(nodeData *Node, nodeId string) {
-	myMeta.Lock()
-	myMeta.NodeMap[nodeId] = nodeData
-	myMeta.Unlock()
+func (meta *NodeMetaData) putNewNode(nodeData *Node, nodeId string) {
+	meta.Lock()
+	meta.NodeMap[nodeId] = nodeData
+	meta.Unlock()
 }
 
-func getNode(nodeId string) (*Node, bool) {
-	myMeta.RLock()
-	result, ok := myMeta.NodeMap[nodeId]
-	myMeta.RUnlock()
+func (meta *NodeMetaData) getNode(nodeId string) (*Node, bool) {
+	meta.RLock()
+	result, ok := meta.NodeMap[nodeId]
+	meta.RUnlock()
 	return result, ok
 }
 
 // get a list of nodes of nodeMap
-func getAllNodes() []*Node {
-	myMeta.RLock()
-	defer myMeta.RUnlock()
-	n := len(myMeta.NodeMap)
+func (meta *NodeMetaData) getAllNodes() []*Node {
+	meta.RLock()
+	defer meta.RUnlock()
+	n := len(meta.NodeMap)
 	nodeList := make([]*Node, n)
 	i := 0
-	for _, node := range myMeta.NodeMap {
+	for _, node := range meta.NodeMap {
 		nodeList[i] = node
 		i++
 	}
@@ -456,21 +453,21 @@ func getAllNodes() []*Node {
 }
 
 // get a copy of nodeMap
-func getNodeMap() map[string]*Node {
-	myMeta.RLock()
-	defer myMeta.RUnlock()
+func (meta *NodeMetaData) getNodeMap() map[string]*Node {
+	meta.RLock()
+	defer meta.RUnlock()
 	mapCopy := make(map[string]*Node)
-	for key, value := range myMeta.NodeMap {
+	for key, value := range meta.NodeMap {
 		mapCopy[key] = value
 	}
 
 	return mapCopy
 }
 
-func getMetaUpdateJson(visitedNodes map[string]bool) []byte {
-	myMeta.RLock()
-	defer myMeta.RUnlock()
-	newMetaUpdate := NodeMetaDataUpdate{myMeta, visitedNodes}
+func (meta *NodeMetaData) getMetaUpdateJson(visitedNodes map[string]bool) []byte {
+	meta.RLock()
+	defer meta.RUnlock()
+	newMetaUpdate := NodeMetaDataUpdate{*meta, visitedNodes}
 	metaUpdate, _ := json.Marshal(newMetaUpdate)
 	return metaUpdate
 }
