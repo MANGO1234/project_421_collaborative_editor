@@ -23,15 +23,12 @@ func main() {
 	}
 
 	nodeId, err := network.Initialize(os.Args[1])
-	mydoc := treedoc.GenerateDoc([]treedoc.Dir{
-		treedoc.Dir{[]byte(nodeId), false}}, "")
-	currentPos := []treedoc.Dir{treedoc.Dir{[]byte(nodeId), false}}
+	err = treedocmanager.createTreedoc(nodeId)
+	// TODO: link cursor position and treedoc posID
+	currentPos := treedocmanager.getCurrentPos()
 
 	util.CheckError(err)
 
-	// TODO initialize treedoc
-	docRoot := treedoc.NewDisambiguatorNode()
-	treedoc.Height(docRoot)
 
 	fmt.Print("> ")
 	scanner := bufio.NewScanner(os.Stdin)
