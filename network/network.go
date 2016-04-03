@@ -57,10 +57,25 @@ const msgTypeTreedocOp = "treedocOp"
 
 // states to keep track of
 var myAddr string
-var mySession *session
 var myMsgChan chan Message
 var myBroadcastChan chan Message
 var myNetMeta netmeta.NetMeta
+var myConnectedNodes map[string]Node
+var myDisconnectedNodes map[string]Node
+var mySession *session
+
+// initialize local network listener
+func Initialize(addr string) (string, error) {
+	myAddr = addr
+	myBroadcastChan = make(chan Message, 15)
+	myMsgChan = make(chan Message)
+	myNetMeta = netmeta.NewNetMeta()
+	myConnectedNodes = make(map[string]Node)
+	myDisconnectedNodes = make(map[string]Node)
+	go serveBroadcastRequests(myBroadcastChan)
+	go serveIncomingMessages(myMsgChan)
+	return startNewSession(addr)
+}
 
 func (s *session) ended() bool {
 	select {
@@ -73,6 +88,7 @@ func (s *session) ended() bool {
 
 func getNewSession(listener *net.TCPListener) *session {
 	s := session{uuid.NewV1().String(), listener, make(chan struct{})}
+	myNetMeta.Update(s.id, netmeta.NodeMeta{myAddr, false})
 	go s.listenForNewConn()
 	go s.periodicallyReconnectDisconnectedNodes()
 	go s.periodicallyCheckVersion()
@@ -82,6 +98,8 @@ func getNewSession(listener *net.TCPListener) *session {
 func (s *session) end() {
 	close(s.done)
 	s.listener.Close()
+	delta := myNetMeta.Update(s.id, netmeta.NodeMeta{myAddr, true})
+	Broadcast(msg)
 	// TODO disconnect all connected nodes
 	s.wg.Wait()
 }
@@ -151,16 +169,6 @@ func checkVersion() {
 	// TODO
 }
 
-// initialize local network listener
-func Initialize(addr string) (string, error) {
-	myAddr = addr
-	myBroadcastChan = make(chan Message, 15)
-	myMsgChan = make(chan Message)
-	go serveBroadcastRequests(myBroadcastChan)
-	go serveIncomingMessages(myMsgChan)
-	return startNewSession(addr)
-}
-
 func serveIncomingMessages(in <-chan Message) {
 	for msg := range in {
 		//TODO
@@ -169,7 +177,7 @@ func serveIncomingMessages(in <-chan Message) {
 
 func serveBroadcastRequests(in <-chan Message) {
 	for msg := range in {
-		//TODO
+		Broadcast(msg)
 	}
 }
 
@@ -198,10 +206,14 @@ func ConnectTo(remoteAddr string) error {
 	// TODO
 }
 
-func Broadcast(msg Message) {
+func BroadcastAsync(msg Message) {
 	go func() {
 		myBroadcastChan <- msg
 	}()
+}
+
+func Broadcast(msg Message) {
+	// TODO
 }
 
 func GetNetworkMetadata() string {
