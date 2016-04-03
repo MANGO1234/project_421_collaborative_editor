@@ -192,8 +192,10 @@ func (buf *Buffer) Insert(pos int, ch byte) {
 	currentLine.bytes = append(currentLine.bytes, 0)
 	copy(currentLine.bytes[currentX+1:], currentLine.bytes[currentX:])
 	currentLine.bytes[currentX] = ch
-	buf.currentPosition++
-	buf.currentX++
+	if pos <= buf.currentPosition {
+		buf.currentPosition++
+	}
+	buf.Resize(buf.width)
 }
 
 func (buf *Buffer) DeleteAtCurrent() {
@@ -203,7 +205,7 @@ func (buf *Buffer) DeleteAtCurrent() {
 }
 
 func (buf *Buffer) BackspaceAtCurrent() {
-	if buf.currentPosition > 0 && buf.numberOfChars > 0 {
+	if buf.currentPosition > 0 {
 		buf.Delete(buf.currentPosition - 1)
 	}
 }
@@ -211,8 +213,10 @@ func (buf *Buffer) BackspaceAtCurrent() {
 func (buf *Buffer) Delete(pos int) {
 	_, currentX, _, currentLine := buf.findPos(pos)
 	currentLine.bytes = append(currentLine.bytes[:currentX], currentLine.bytes[currentX+1:]...)
-	buf.currentPosition--
-	buf.currentX--
+	if pos < buf.currentPosition {
+		buf.currentPosition--
+	}
+	buf.Resize(buf.width)
 }
 
 func (buf *Buffer) SetPosition(pos int) {

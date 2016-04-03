@@ -61,7 +61,7 @@ func InitEditor() error {
 		build.WriteString(strconv.Itoa(i))
 		build.WriteString("\n")
 	}
-	buf := StringToBuffer(build.String(), width-1)
+	buf := StringToBuffer(build.String(), width)
 	DrawLines(buf.Lines(), height)
 	termbox.SetCursor(0, 0)
 	termbox.Flush()
@@ -105,9 +105,6 @@ func InitEditor() error {
 				termbox.Flush()
 			case termbox.KeyBackspace:
 				buf.BackspaceAtCurrent()
-				oldBuf := buf
-				buf = StringToBuffer(oldBuf.ToString(), width)
-				buf.SetPosition(oldBuf.currentPosition)
 				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 				DrawLines(lines, height)
@@ -115,9 +112,13 @@ func InitEditor() error {
 				termbox.Flush()
 			case termbox.KeyDelete:
 				buf.DeleteAtCurrent()
-				oldBuf := buf
-				buf = StringToBuffer(oldBuf.ToString(), width)
-				buf.SetPosition(oldBuf.currentPosition)
+				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+				DrawLines(lines, height)
+				termbox.SetCursor(cursorX, cursorY)
+				termbox.Flush()
+			case termbox.KeySpace:
+				buf.InsertAtCurrent(' ')
 				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 				DrawLines(lines, height)
@@ -137,10 +138,10 @@ func InitEditor() error {
 			width = ev.Width
 			height = ev.Height
 			buf.Resize(width)
-			screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
 			// this is a bug within the library, without this call clear would panic when
 			// cursor is outside of resized window
 			termbox.HideCursor()
+			screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
 			termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 			DrawLines(lines, height)
 			termbox.SetCursor(cursorX, cursorY)
