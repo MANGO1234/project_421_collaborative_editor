@@ -188,6 +188,7 @@ func (buf *Buffer) MoveRight() {
 func (buf *Buffer) MoveUp() {
 	if buf.currentLine.prev != nil {
 		target := sliceLength(buf.currentLine.bytes[:buf.currentX+1])
+		buf.currentPosition -= buf.currentX + 1
 		buf.currentLine = buf.currentLine.prev
 		buf.currentY--
 		buf.currentX = 0
@@ -196,17 +197,18 @@ func (buf *Buffer) MoveUp() {
 			s += charLength(ch)
 			if s > target {
 				buf.currentX--
-				return
+				break
 			}
 			buf.currentX++
 		}
-		buf.currentX--
+		buf.currentPosition -= len(buf.currentLine.bytes) - buf.currentX - 1
 	}
 }
 
 func (buf *Buffer) MoveDown() {
 	if buf.currentLine.next != nil {
 		target := sliceLength(buf.currentLine.bytes[:buf.currentX+1])
+		buf.currentPosition += len(buf.currentLine.bytes) - buf.currentX
 		buf.currentLine = buf.currentLine.next
 		buf.currentY++
 		buf.currentX = 0
@@ -215,11 +217,29 @@ func (buf *Buffer) MoveDown() {
 			s += charLength(ch)
 			if s > target {
 				buf.currentX--
-				return
+				break
 			}
 			buf.currentX++
 		}
-		buf.currentX--
+		buf.currentPosition += buf.currentX
+	}
+}
+
+func (buf *Buffer) SetPosition(pos int) {
+	buf.currentPosition = pos
+	buf.currentLine = buf.lines
+	buf.currentY = 0
+	buf.currentX = 0
+	acc := -1 // to account for sentinel
+	for {
+		if acc+len(buf.currentLine.bytes) >= pos {
+			buf.currentX = pos - acc - 1
+			break
+		} else {
+			acc += len(buf.currentLine.bytes)
+			buf.currentLine = buf.currentLine.next
+			buf.currentY++
+		}
 	}
 }
 

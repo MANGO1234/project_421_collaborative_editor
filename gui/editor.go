@@ -94,8 +94,16 @@ func InitEditor() error {
 				termbox.Flush()
 			}
 		case termbox.EventResize:
+			width = ev.Width
+			height = ev.Height
+			oldBuf := buf
+			// TODO: optimize this if have time
+			buf = StringToBuffer(oldBuf.ToString(), width)
+			buf.SetPosition(oldBuf.currentPosition)
+			screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
 			termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-			DrawLines(buf.Lines())
+			DrawLines(lines)
+			termbox.SetCursor(cursorX, cursorY)
 			termbox.Flush()
 		case termbox.EventError:
 			panic(ev.Err)
