@@ -11,28 +11,22 @@ package network
 
 import (
 	"../util"
-	"bufio"
-	"encoding/json"
+	"./netmeta"
 	"errors"
-	"fmt"
 	"github.com/satori/go.uuid"
-	"net"
 	"sync"
+	"time"
 )
 
-// data structures
-
 type Node struct {
-	// listening ip:port
-	Addr string
-	// quitted if the node voluntarily leaves the network
-	// what's quitted stays quitted
-	Quitted bool
+	addr string
+	conn *ConnWrapper
+}
 
-	// fields below are for internal operations
-	connected bool
-	in        *ConnWrapper
-	out       *ConnWrapper
+type Message struct {
+	Type    string
+	Visited map[string]bool
+	Msg     []byte
 }
 
 type ConnWrapper struct {
@@ -41,439 +35,157 @@ type ConnWrapper struct {
 	writer *util.MessageWriter
 }
 
-type NodeMetaData struct {
-	sync.RWMutex //only for the map
-	Id           string
-	Addr         string
-	NodeMap      map[string]*Node
-	listener     *net.TCPListener
-	initialized  bool
+type session struct {
+	sync.WaitGroup
+	id       string
+	listener *net.TCPListener
+	done     chan struct{}
 }
 
-type NodeMetaDataUpdate struct {
-	NodeMeta     NodeMetaData
-	VisitedNodes map[string]bool
+// constants
+// how often to check version vector and network metadata
+const versionCheckInterval = 30
+
+// how often to reconnect to disconnected nodes
+const reconnectInterval = 30
+
+// states to keep track of
+var myAddr string
+var mySession *session
+var myMsgChan chan Message
+var myBroadcast chan Message
+var myNetMeta netmeta.NetMeta
+
+func (s *session) ended() bool {
+	select {
+	case <-s.done:
+		return true
+	default:
+		return false
+	}
 }
 
-// message type identifiers
-const regMsg string = "registration"
-const leaveMsg string = "disconnection"
-const metaUpdateMsg string = "metaUpdate"
+func getNewSession(listener *net.TCPListener) *session {
+	s := session{uuid.NewV1().String(), listener, make(chan struct{})}
+	go s.listenForNewConn()
+	go s.periodicallyReconnectDisconnectedNodes()
+	go s.periodicallyCheckVersion()
+	return s
+}
 
-// global variables
-var myMeta NodeMetaData = NodeMetaData{NodeMap: make(map[string]*Node)} // keeps track of my NodeMetaData
+func (s *session) end() {
+	close(s.done)
+	s.listener.Close()
+	// TODO disconnect all connected nodes
+	s.wg.Wait()
+}
+
+func startNewSession() (string, error) {
+	if mySession != nil {
+		return "", errors.New("The node is already connected!")
+	}
+	lAddr, err := net.ResolveTCPAddr("tcp", addr)
+	if err != nil {
+		return "", err
+	}
+	listener, err := net.ListenTCP("tcp", lAddr)
+	if err != nil {
+		return "", err
+	}
+	//util.Debug("listening on ", lAddr.String())
+	mySession = getNewSession(listener)
+	return mySession.id, nil
+}
+
+// These functions launches major network threads
+func (s *session) listenForNewConn() {
+	s.Add(1)
+	defer s.Done()
+	for {
+		if s.ended() {
+			return
+		}
+		conn, err := s.listener.Accept()
+		if err == nil {
+			go handleNewConn(conn)
+		}
+	}
+}
+
+func handleNewConn(conn net.Conn) {
+	// TODO
+}
+
+func (s *session) periodicallyReconnectDisconnectedNodes() {
+	s.Add(1)
+	defer s.Done()
+	for {
+		if s.ended() {
+			return
+		}
+		reconnectDisconnectedNodes()
+		time.Sleep(time.Second * reconnectInterval)
+	}
+}
+
+func reconnectDisconnectedNodes() {
+	// TODO
+}
+
+func (s *session) periodicallyCheckVersion() {
+	s.Add(1)
+	defer s.Done()
+	for {
+		if s.ended() {
+			return
+		}
+		checkVersion()
+		time.Sleep(time.Second * versionCheckInterval)
+	}
+}
+
+func checkVersion() {
+	// TODO
+}
 
 // initialize local network listener
-func Initialize(addr string) (id string, err error) {
+func Initialize(addr string) (string, error) {
+	myAddr = addr
 	return startNewSession(addr)
 }
 
-func startNewSession(addr string) (id string, err error) {
-	if myMeta.initialized {
-		return
-	}
-	lAddr, err := net.ResolveTCPAddr("tcp", addr)
-	myListener, err := net.ListenTCP("tcp", lAddr)
-	if err == nil {
-		fmt.Println("listening on ", lAddr.String())
-		myMeta.Id = uuid.NewV1().String()
-		id = myMeta.Id
-		myMeta.Addr = lAddr.String()
-		myMeta.listener = myListener
-		myMeta.initialized = true
-		go listenForConn(myListener)
-	}
-	return
+func goHandleIncomingMsg() chan Message {
+	msgChan := make(chan Message)
+	go func() {
+
+	}()
+	return msgChan
 }
 
-// listen for incoming connection to register
-func listenForConn(listener *net.TCPListener) {
-	for {
-		conn, err := listener.Accept()
-		if err == nil {
-			go handleConn(conn)
-		}
-	}
+func goServeBroadcast() chan Message {
+	broadcastChan := make(chan Message)
+	go func() {
+
+	}()
+	return broadcastChan
 }
 
 // Disconnect from the network voluntarily
 func Disconnect() {
-	// refuse new incoming connections
-	myMeta.listener.Close() // best attemp, error ignored
-	// close all incoming and outgoing connection
-	nodeList := myMeta.getAllNodes()
-	for _, node := range nodeList {
-		if !node.Quitted {
-			// close all existing incoming connections
-			node.closeInConn()
-			// send disconnection notice & disconnect
-			if node.out != nil {
-				err := node.out.writer.WriteMessage2(leaveMsg, make([]byte, 100))
-				handleError(err)
-				node.closeOutConn()
-				fmt.Printf("disconnect from: %s\n", node.Addr)
-			}
-		}
-	}
-	myMeta.initialized = false
 }
 
 // Re-initialize node with new UUID.
 func Reconnect() error {
-	if myMeta.initialized == true {
-		return errors.New("Please use reconnect only after you disconnect.")
-	}
-	_, err := startNewSession(myMeta.Addr)
-	if err == nil {
-		// connect to all previously known nodes
-		connectKnownNodes()
-	}
-	return err
-}
-
-func connectKnownNodes() {
-	nodeList := myMeta.getAllNodes()
-	for _, node := range nodeList {
-		if !node.Quitted {
-			err := connectToHelper(node.Addr)
-			// TODO: handle connection error here
-			if err != nil {
-			}
-		}
-	}
-}
-
-// get a new ConnWrapper around a connection
-func newConnWrapper(conn net.Conn) *ConnWrapper {
-	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
-	msgReader := util.MessageReader{bufio.NewReader(conn)}
-	wrapper := ConnWrapper{conn, &msgReader, &msgWriter}
-	return &wrapper
-}
-
-// handle node joining or rejoining
-func handleConn(conn net.Conn) {
-	// receive registration information
-	wrapper := newConnWrapper(conn)
-
-	msgInType, m, err := wrapper.reader.ReadMessage2()
-	if err != nil || msgInType != regMsg {
-		conn.Close()
-		return
-	}
-
-	msgIn, err := jsonToMeta(m)
-	if err != nil {
-		conn.Close()
-		return
-	}
-
-	// write back registration information
-	replyMsg := myMeta.toJson()
-	wrapper.writer.WriteMessage2(regMsg, replyMsg)
-
-	//add this node to nodeMap
-	node, ok := myMeta.getNode(msgIn.Id)
-	if !ok {
-		newNode := Node{msgIn.Addr, false, true, wrapper, nil}
-		myMeta.putNewNode(&newNode, msgIn.Id)
-		fmt.Printf("received connection: %s(%s)\n", msgIn.Id, msgIn.Addr)
-		connectToHelper(msgIn.Addr)
-	} else {
-		if node.Quitted {
-			conn.Close()
-			node.closeInConn()
-			node.closeOutConn()
-			return
-		}
-		node.closeInConn()
-		node.in = wrapper
-		node.connected = true
-		fmt.Printf("received connection: %s(%s)\n", msgIn.Id, msgIn.Addr)
-	}
-	changed, visitedNodes := handleNodesMap(msgIn.NodeMap)
-
-	visitedNodes[msgIn.Id] = true
-	visitedNodes[myMeta.Id] = true
-
-	// broadcast new nodeMap to peers only if current call has resulted change in current nodeMap
-	if changed || !ok {
-		broadcastToPeer(visitedNodes)
-	}
-	foreverRead(msgIn.Id, wrapper.reader)
-}
-
-// handle
-func foreverRead(id string, msgReader *util.MessageReader) {
-	for {
-		msgInType, msg, err := msgReader.ReadMessage2()
-		if err != nil {
-			handleError(err)
-			return
-		}
-		switch msgInType {
-		case leaveMsg:
-			handleLeave(id)
-			return
-		case metaUpdateMsg:
-			receivedUpdate, err := JsonToMetaUpdate(msg)
-			fmt.Println("-----received MetaUpdate Message from", receivedUpdate.NodeMeta.Addr)
-			if err == nil {
-				handleMetaUpdate(receivedUpdate)
-			}
-		default:
-			return
-		}
-
-	}
-
-}
-
-func handleMetaUpdate(receivedUpdate NodeMetaDataUpdate) {
-	changed, contactedNodes := handleNodesMap(receivedUpdate.NodeMeta.NodeMap)
-	if changed {
-		for key, _ := range receivedUpdate.VisitedNodes {
-			contactedNodes[key] = true
-		}
-		contactedNodes[myMeta.Id] = true
-		broadcastToPeer(contactedNodes)
-	}
-}
-
-func handleLeave(id string) {
-	node, ok := myMeta.getNode(id)
-	if ok {
-		node.closeInConn()
-		node.closeOutConn()
-		node.Quitted = true
-		node.connected = false
-		fmt.Printf("node quitted: %s(%s)\n", id, node.Addr)
-	}
-	visitedNodes := make(map[string]bool)
-	visitedNodes[id] = true
-	visitedNodes[myMeta.Id] = true
-
-	broadcastToPeer(visitedNodes)
 }
 
 // All the following functions assume an Initialize call has been made
-
 func ConnectTo(remoteAddr string) error {
-	if myMeta.initialized == false {
-		err := Reconnect()
-		if err != nil {
-			return err
-		}
-	}
-
-	if myMeta.Addr == remoteAddr {
-		return errors.New("Please enter an address that's different from your local address.")
-	}
-
-	// TODO : fix possible connect to an address twice problem maybe by reordering method call
-	return connectToHelper(remoteAddr)
 }
 
-// TODO: possible refactoring?
-func startConnection(remoteAddr string, nodeId string) {
-
-}
-
-func connectToHelper(remoteAddr string) error {
-	conn, err := net.Dial("tcp", remoteAddr)
-	if err != nil {
-		return err
-	}
-	//	fmt.Println("connecting to:", remoteAddr)
-	wrapper := newConnWrapper(conn)
-
-	// send registration information
-	msg := myMeta.toJson()
-	err = wrapper.writer.WriteMessage2(regMsg, msg)
-	if err != nil {
-		conn.Close()
-		return err
-	}
-
-	// receive registration information
-	msgType, msgBuff, err := wrapper.reader.ReadMessage2()
-	if err != nil || msgType != regMsg {
-		conn.Close()
-		return err
-	}
-	receivedMeta, err := jsonToMeta(msgBuff)
-	if err != nil {
-		conn.Close()
-		return err
-	}
-
-	//add this node to nodeMap
-	node, ok := myMeta.getNode(receivedMeta.Id)
-	if !ok {
-		newNode := Node{receivedMeta.Addr, false, true, nil, wrapper}
-		myMeta.putNewNode(&newNode, receivedMeta.Id)
-	} else {
-		if node.Quitted {
-			conn.Close()
-			node.closeInConn()
-			node.closeOutConn()
-			return nil
-		}
-		node.closeOutConn()
-		node.out = wrapper
-		node.connected = true
-	}
-	fmt.Printf("dialed connection: %s(%s)\n", receivedMeta.Id, receivedMeta.Addr)
-	//	handleNodesMap(receivedMeta.NodeMap)
-
-	return nil
-}
-
-func Broadcast() {
+func Broadcast(msg *BroadcastMsg) {
 
 }
 
 func GetNetworkMetadata() string {
 	return string(myMeta.toJson())
-}
-
-// broadcast current node meta data to all peers except for those who have been contacted already
-func broadcastToPeer(visitedNodes map[string]bool) {
-	nodeMap := myMeta.getNodeMap()
-	metaUpdate := myMeta.getMetaUpdateJson(visitedNodes)
-	for id, node := range nodeMap {
-		_, ok := visitedNodes[id]
-		if !node.Quitted && !ok {
-			node.sendMsg(metaUpdateMsg, metaUpdate)
-			fmt.Println("broadcasted change to " + node.Addr)
-		}
-	}
-}
-
-// handle received nodeMap appropriately
-// return a bool indicating if receivedNodeMap has caused any change to current metadata
-// return a list of nodeIds being contacted during this process
-func handleNodesMap(receivedNodeMap map[string]*Node) (bool, map[string]bool) {
-	var changed bool
-	contactedNodes := make(map[string]bool)
-
-	for key, value := range receivedNodeMap {
-		node, ok := myMeta.getNode(key)
-		contactedNodes[key] = false
-		if !ok && key != myMeta.Id && value.Addr != myMeta.Addr {
-			myMeta.putNewNode(value, key)
-			if !value.Quitted {
-				connectToHelper(value.Addr)
-				contactedNodes[key] = true
-			}
-			changed = true
-		}
-
-		if ok && value.Quitted && !node.Quitted {
-			handleLeave(key)
-			changed = true
-		} else if ok {
-			contactedNodes[key] = true
-		}
-	}
-
-	return changed, contactedNodes
-}
-
-func handleError(error error) {
-
-}
-
-func (node *Node) closeInConn() {
-	if node.in != nil {
-		node.in.conn.Close()
-		node.in = nil
-	}
-}
-
-func (node *Node) closeOutConn() {
-	if node.out != nil {
-		node.out.conn.Close()
-		node.out = nil
-	}
-}
-
-func (node *Node) closeAllConn() {
-	node.closeInConn()
-	node.closeOutConn()
-}
-
-func (node *Node) sendMsg(msgType string, msg []byte) error {
-	if node.out != nil {
-		return node.out.writer.WriteMessage2(msgType, msg)
-	}
-	return errors.New("No out connection available.")
-}
-
-// Following functions are wrappers & helpers for accessing network metadata
-
-func (meta *NodeMetaData) toJson() []byte {
-	meta.RLock()
-	defer meta.RUnlock()
-	metaJson, _ := json.Marshal(meta)
-	return metaJson
-}
-
-func jsonToMeta(msg []byte) (NodeMetaData, error) {
-	var meta NodeMetaData
-	err := json.Unmarshal(msg, &meta)
-	return meta, err
-}
-
-func (meta *NodeMetaData) putNewNode(nodeData *Node, nodeId string) {
-	meta.Lock()
-	meta.NodeMap[nodeId] = nodeData
-	meta.Unlock()
-}
-
-func (meta *NodeMetaData) getNode(nodeId string) (*Node, bool) {
-	meta.RLock()
-	result, ok := meta.NodeMap[nodeId]
-	meta.RUnlock()
-	return result, ok
-}
-
-// get a list of nodes of nodeMap
-func (meta *NodeMetaData) getAllNodes() []*Node {
-	meta.RLock()
-	defer meta.RUnlock()
-	n := len(meta.NodeMap)
-	nodeList := make([]*Node, n)
-	i := 0
-	for _, node := range meta.NodeMap {
-		nodeList[i] = node
-		i++
-	}
-	return nodeList
-}
-
-// get a copy of nodeMap
-func (meta *NodeMetaData) getNodeMap() map[string]*Node {
-	meta.RLock()
-	defer meta.RUnlock()
-	mapCopy := make(map[string]*Node)
-	for key, value := range meta.NodeMap {
-		mapCopy[key] = value
-	}
-
-	return mapCopy
-}
-
-func (meta *NodeMetaData) getMetaUpdateJson(visitedNodes map[string]bool) []byte {
-	meta.RLock()
-	defer meta.RUnlock()
-	newMetaUpdate := NodeMetaDataUpdate{*meta, visitedNodes}
-	metaUpdate, _ := json.Marshal(newMetaUpdate)
-	return metaUpdate
-}
-
-func JsonToMetaUpdate(message []byte) (NodeMetaDataUpdate, error) {
-	var metaUpdate NodeMetaDataUpdate
-	err := json.Unmarshal(message, &metaUpdate)
-	return metaUpdate, err
 }
