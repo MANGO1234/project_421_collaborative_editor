@@ -30,4 +30,16 @@ func TestStringToBuffer(t *testing.T) {
 	assertEqual(t, "abc abc\n\tdef def", buf.ToString())
 	assertEqual(t, len("abc abc\n\tdef def"), buf.numberOfChars)
 	assertEqual(t, 3, buf.numberOfLines)
+
+	buf = StringToBuffer("abc abcabcabc", 10)
+	assertEqual(t, "abc abcabcabc", buf.ToString())
+	assertEqual(t, len("abc abcabcabc"), buf.numberOfChars)
+	assertEqual(t, 2, buf.numberOfLines)
+	assertEqual(t, "abc ", string(buf.lines.bytes))
+	assertEqual(t, "abcabcabc\n", string(buf.lines.next.bytes))
+
+	buf = StringToBuffer("abcabcabcabcabcabcabcabcabcabcabcdef", 10)
+	assertEqual(t, "abcabcabcabcabcabcabcabcabcabcabcdef", buf.ToString())
+	assertEqual(t, len("abcabcabcabcabcabcabcabcabcabcabcdef"), buf.numberOfChars)
+	assertEqual(t, 4, buf.numberOfLines)
 }

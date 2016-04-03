@@ -42,6 +42,23 @@ func InitEditor() error {
 		build.WriteString(strconv.Itoa(i))
 		build.WriteString(" ")
 		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(strconv.Itoa(i))
 		build.WriteString("\n")
 	}
 	buf := StringToBuffer(build.String(), width-1)
@@ -87,6 +104,20 @@ func InitEditor() error {
 				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
 			case termbox.KeyBackspace:
+				buf.BackspaceAtCurrent()
+				oldBuf := buf
+				buf = StringToBuffer(oldBuf.ToString(), width)
+				buf.SetPosition(oldBuf.currentPosition)
+				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+				DrawLines(lines, height)
+				termbox.SetCursor(cursorX, cursorY)
+				termbox.Flush()
+			case termbox.KeyDelete:
+				buf.DeleteAtCurrent()
+				oldBuf := buf
+				buf = StringToBuffer(oldBuf.ToString(), width)
+				buf.SetPosition(oldBuf.currentPosition)
 				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 				DrawLines(lines, height)
@@ -94,9 +125,9 @@ func InitEditor() error {
 				termbox.Flush()
 			default:
 				if ev.Ch <= 256 {
+					buf.InsertAtCurrent(byte(ev.Ch))
 					screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
 					termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-					//					ch := byte(ev.Ch)
 					DrawLines(lines, height)
 					termbox.SetCursor(cursorX, cursorY)
 					termbox.Flush()
@@ -105,10 +136,7 @@ func InitEditor() error {
 		case termbox.EventResize:
 			width = ev.Width
 			height = ev.Height
-			oldBuf := buf
-			//			 TODO: optimize this if have time
-			buf = StringToBuffer(oldBuf.ToString(), width)
-			buf.SetPosition(oldBuf.currentPosition)
+			buf.Resize(width)
 			screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
 			// this is a bug within the library, without this call clear would panic when
 			// cursor is outside of resized window
