@@ -18,6 +18,23 @@ func DrawBuffer(buffer [][]byte) {
 	}
 }
 
+func DrawLines(lines *Line) {
+	y := 0
+	for lines != nil {
+		x := 0
+		for _, ch := range lines.bytes {
+			if ch == '\t' {
+				x += 4
+			} else if ch != '\n' {
+				termbox.SetCell(x, y, rune(ch), termbox.ColorWhite, termbox.ColorDefault)
+				x++
+			}
+		}
+		y++
+		lines = lines.next
+	}
+}
+
 func InitEditor() error {
 	err := termbox.Init()
 	if err != nil {
@@ -38,7 +55,9 @@ func InitEditor() error {
 	v = append(v, 'e')
 	v = append(v, 'f')
 	k = append(k, v)
-	DrawBuffer(k)
+	buf := StringToBuffer("abc abc\ndef def def aasdfa asdfa asdfa asdfa asdfas \t asdfasdf", 20)
+	DrawLines(buf.Lines())
+	//	DrawBuffer(k)
 	termbox.SetCursor(0, 0)
 	termbox.Flush()
 
@@ -48,7 +67,8 @@ func InitEditor() error {
 			if ev.Key == termbox.KeyCtrlC {
 				return nil
 			}
-			DrawBuffer(k)
+			termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+			DrawLines(buf.Lines())
 			termbox.Flush()
 		case termbox.EventResize:
 			termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
