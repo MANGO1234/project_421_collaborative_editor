@@ -139,7 +139,7 @@ func InitEditor() error {
 				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
 			default:
-				if ev.Ch <= 256 {
+				if ev.Key == 0 && ev.Ch <= 256 {
 					buf.InsertAtCurrent(byte(ev.Ch))
 					screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
 					termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)

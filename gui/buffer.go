@@ -130,7 +130,7 @@ func (buf *Buffer) MoveUp() {
 		s := 0
 		for _, ch := range buf.currentLine.bytes {
 			s += charLength(ch)
-			if s > target {
+			if s > target || ch == '\n' {
 				break
 			}
 			buf.currentX++
@@ -152,7 +152,7 @@ func (buf *Buffer) MoveDown() {
 		s := 0
 		for _, ch := range buf.currentLine.bytes {
 			s += charLength(ch)
-			if s > target {
+			if s > target || ch == '\n' {
 				break
 			}
 			buf.currentX++
