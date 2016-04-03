@@ -49,11 +49,17 @@ const versionCheckInterval = 30
 // how often to reconnect to disconnected nodes
 const reconnectInterval = 30
 
+// message types
+const msgTypeVersionCheck = "versioncheck"
+const msgTypeSync = "sync"
+const msgTypeNetMetaUpdate = "netmeta"
+const msgTypeTreedocOp = "treedocOp"
+
 // states to keep track of
 var myAddr string
 var mySession *session
 var myMsgChan chan Message
-var myBroadcast chan Message
+var myBroadcastChan chan Message
 var myNetMeta netmeta.NetMeta
 
 func (s *session) ended() bool {
@@ -81,10 +87,7 @@ func (s *session) end() {
 }
 
 func startNewSession() (string, error) {
-	if mySession != nil {
-		return "", errors.New("The node is already connected!")
-	}
-	lAddr, err := net.ResolveTCPAddr("tcp", addr)
+	lAddr, err := net.ResolveTCPAddr("tcp", myAddr)
 	if err != nil {
 		return "", err
 	}
@@ -151,41 +154,56 @@ func checkVersion() {
 // initialize local network listener
 func Initialize(addr string) (string, error) {
 	myAddr = addr
+	myBroadcastChan = make(chan Message, 15)
+	myMsgChan = make(chan Message)
+	go serveBroadcastRequests(myBroadcastChan)
+	go serveIncomingMessages(myMsgChan)
 	return startNewSession(addr)
 }
 
-func goHandleIncomingMsg() chan Message {
-	msgChan := make(chan Message)
-	go func() {
-
-	}()
-	return msgChan
+func serveIncomingMessages(in <-chan Message) {
+	for msg := range in {
+		//TODO
+	}
 }
 
-func goServeBroadcast() chan Message {
-	broadcastChan := make(chan Message)
-	go func() {
-
-	}()
-	return broadcastChan
+func serveBroadcastRequests(in <-chan Message) {
+	for msg := range in {
+		//TODO
+	}
 }
 
 // Disconnect from the network voluntarily
-func Disconnect() {
+func Disconnect() error {
+	if mySession == nil {
+		return errors.New("Already disconnected")
+	}
+	mySession.end()
+	mySession = nil
 }
 
 // Re-initialize node with new UUID.
-func Reconnect() error {
+func Reconnect() (string, error) {
+	if mySession != nil {
+		return "", errors.New("The node is already connected!")
+	}
+	return startNewSession()
 }
 
 // All the following functions assume an Initialize call has been made
 func ConnectTo(remoteAddr string) error {
+	if mySession == nil {
+		startNewSession() //TODO
+	}
+	// TODO
 }
 
-func Broadcast(msg *BroadcastMsg) {
-
+func Broadcast(msg Message) {
+	go func() {
+		myBroadcastChan <- msg
+	}()
 }
 
 func GetNetworkMetadata() string {
-	return string(myMeta.toJson())
+	// TODO
 }
