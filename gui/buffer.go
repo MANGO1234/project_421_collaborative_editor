@@ -105,8 +105,6 @@ func StringToBuffer(str string, width int) *Buffer {
 
 func SeqToLines(seq ByteSequence, width int) (*Line, int, int) {
 	line := &Line{bytes: make([]byte, 0, width+1)}
-	// a sentinel \n at the beginning to remove edge cases from various methods
-	line.bytes = append(line.bytes, '\n')
 	startLine := line
 	i := 0
 	numberOfLines := 1
@@ -119,10 +117,10 @@ func SeqToLines(seq ByteSequence, width int) (*Line, int, int) {
 		}
 
 		if word[0] == '\n' {
+			line.bytes = append(line.bytes, '\n')
 			lastLine := line
 			line = &Line{bytes: make([]byte, 0, width), prev: lastLine}
 			lastLine.next = line
-			line.bytes = append(line.bytes, '\n')
 			i = 0
 			numberOfLines++
 			continue
@@ -158,6 +156,8 @@ func SeqToLines(seq ByteSequence, width int) (*Line, int, int) {
 			continue
 		}
 	}
+	// a sentinel \n at the end to remove edge cases from various methods
+	line.bytes = append(line.bytes, '\n')
 	return startLine, numberOfLines, numberOfChars
 }
 
@@ -187,8 +187,8 @@ func (buf *Buffer) MoveRight() {
 
 func (buf *Buffer) MoveUp() {
 	if buf.currentLine.prev != nil {
-		target := sliceLength(buf.currentLine.bytes[:buf.currentX+1])
-		buf.currentPosition -= buf.currentX + 1
+		target := sliceLength(buf.currentLine.bytes[:buf.currentX])
+		buf.currentPosition -= buf.currentX
 		buf.currentLine = buf.currentLine.prev
 		buf.currentY--
 		buf.currentX = 0
@@ -196,18 +196,20 @@ func (buf *Buffer) MoveUp() {
 		for _, ch := range buf.currentLine.bytes {
 			s += charLength(ch)
 			if s > target {
-				buf.currentX--
 				break
 			}
 			buf.currentX++
+			if s == target {
+				break
+			}
 		}
-		buf.currentPosition -= len(buf.currentLine.bytes) - buf.currentX - 1
+		buf.currentPosition -= len(buf.currentLine.bytes) - buf.currentX
 	}
 }
 
 func (buf *Buffer) MoveDown() {
 	if buf.currentLine.next != nil {
-		target := sliceLength(buf.currentLine.bytes[:buf.currentX+1])
+		target := sliceLength(buf.currentLine.bytes[:buf.currentX])
 		buf.currentPosition += len(buf.currentLine.bytes) - buf.currentX
 		buf.currentLine = buf.currentLine.next
 		buf.currentY++
@@ -216,10 +218,12 @@ func (buf *Buffer) MoveDown() {
 		for _, ch := range buf.currentLine.bytes {
 			s += charLength(ch)
 			if s > target {
-				buf.currentX--
 				break
 			}
 			buf.currentX++
+			if s == target {
+				break
+			}
 		}
 		buf.currentPosition += buf.currentX
 	}
@@ -230,10 +234,10 @@ func (buf *Buffer) SetPosition(pos int) {
 	buf.currentLine = buf.lines
 	buf.currentY = 0
 	buf.currentX = 0
-	acc := -1 // to account for sentinel
+	acc := 0
 	for {
-		if acc+len(buf.currentLine.bytes) >= pos {
-			buf.currentX = pos - acc - 1
+		if acc+len(buf.currentLine.bytes) > pos {
+			buf.currentX = pos - acc
 			break
 		} else {
 			acc += len(buf.currentLine.bytes)
@@ -250,7 +254,7 @@ func (buf *Buffer) GetDisplayInformation(screenY, height int) (int, int, int, *L
 		screenY = buf.currentY - height + 1
 	}
 	cursorY := buf.currentY - screenY
-	cursorX := sliceLength(buf.currentLine.bytes[:buf.currentX+1])
+	cursorX := sliceLength(buf.currentLine.bytes[:buf.currentX])
 	line := buf.currentLine
 	for i := 0; i < cursorY; i++ {
 		line = line.prev
@@ -265,12 +269,13 @@ func (buf *Buffer) Lines() *Line {
 func (buf *Buffer) ToString() string {
 	builder := bytes.Buffer{}
 	lines := buf.lines
-	builder.Write(lines.bytes[1:])
+	builder.Write(lines.bytes[0:])
 	lines = lines.next
 	for lines != nil {
 		builder.Write(lines.bytes)
 		lines = lines.next
 	}
+	builder.Truncate(builder.Len() - 1)
 	return builder.String()
 }
 

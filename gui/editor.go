@@ -6,9 +6,9 @@ import (
 	"strconv"
 )
 
-func DrawLines(lines *Line) {
+func DrawLines(lines *Line, height int) {
 	y := 0
-	for lines != nil {
+	for lines != nil && y < height {
 		x := 0
 		for _, ch := range lines.bytes {
 			if ch == '\t' {
@@ -45,7 +45,7 @@ func InitEditor() error {
 		build.WriteString("\n")
 	}
 	buf := StringToBuffer(build.String(), width-1)
-	DrawLines(buf.Lines())
+	DrawLines(buf.Lines(), height)
 	termbox.SetCursor(0, 0)
 	termbox.Flush()
 
@@ -62,47 +62,59 @@ func InitEditor() error {
 				buf.MoveLeft()
 				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-				DrawLines(lines)
+				DrawLines(lines, height)
 				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
 			case termbox.KeyArrowRight:
 				buf.MoveRight()
 				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-				DrawLines(lines)
+				DrawLines(lines, height)
 				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
 			case termbox.KeyArrowUp:
 				buf.MoveUp()
 				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-				DrawLines(lines)
+				DrawLines(lines, height)
 				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
 			case termbox.KeyArrowDown:
 				buf.MoveDown()
 				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-				DrawLines(lines)
+				DrawLines(lines, height)
+				termbox.SetCursor(cursorX, cursorY)
+				termbox.Flush()
+			case termbox.KeyBackspace:
+				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+				DrawLines(lines, height)
 				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
 			default:
-				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
-				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-				DrawLines(lines)
-				termbox.SetCursor(cursorX, cursorY)
-				termbox.Flush()
+				if ev.Ch <= 256 {
+					screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+					termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+					//					ch := byte(ev.Ch)
+					DrawLines(lines, height)
+					termbox.SetCursor(cursorX, cursorY)
+					termbox.Flush()
+				}
 			}
 		case termbox.EventResize:
 			width = ev.Width
 			height = ev.Height
 			oldBuf := buf
-			// TODO: optimize this if have time
+			//			 TODO: optimize this if have time
 			buf = StringToBuffer(oldBuf.ToString(), width)
 			buf.SetPosition(oldBuf.currentPosition)
 			screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+			// this is a bug within the library, without this call clear would panic when
+			// cursor is outside of resized window
+			termbox.HideCursor()
 			termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-			DrawLines(lines)
+			DrawLines(lines, height)
 			termbox.SetCursor(cursorX, cursorY)
 			termbox.Flush()
 		case termbox.EventError:
