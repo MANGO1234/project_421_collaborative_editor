@@ -1,22 +1,10 @@
 package gui
 
 import (
+	"bytes"
 	"github.com/nsf/termbox-go"
+	"strconv"
 )
-
-func DrawBuffer(buffer [][]byte) {
-	for y, line := range buffer {
-		x := 0
-		for _, ch := range line {
-			if ch == '\t' {
-				x += 4
-			} else {
-				termbox.SetCell(x, y, rune(ch), termbox.ColorWhite, termbox.ColorDefault)
-				x++
-			}
-		}
-	}
-}
 
 func DrawLines(lines *Line) {
 	y := 0
@@ -24,6 +12,9 @@ func DrawLines(lines *Line) {
 		x := 0
 		for _, ch := range lines.bytes {
 			if ch == '\t' {
+				for i := 0; i < 4; i++ {
+					termbox.SetCell(x+i, y, ' ', termbox.ColorWhite, termbox.ColorDefault)
+				}
 				x += 4
 			} else if ch != '\n' {
 				termbox.SetCell(x, y, rune(ch), termbox.ColorWhite, termbox.ColorDefault)
@@ -41,42 +32,53 @@ func InitEditor() error {
 		return err
 	}
 
-	termbox.SetInputMode(termbox.InputEsc | termbox.InputMouse)
+	width, _ := termbox.Size()
+	termbox.SetInputMode(termbox.InputEsc)
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-	k := make([][]byte, 0, 4)
-	v := make([]byte, 0, 4)
-	v = append(v, 'a')
-	v = append(v, 'b')
-	v = append(v, 'c')
-	k = append(k, v)
-	v = make([]byte, 0, 4)
-	v = append(v, '\t')
-	v = append(v, 'd')
-	v = append(v, 'e')
-	v = append(v, 'f')
-	k = append(k, v)
-	buf := StringToBuffer("abc abc\ndef def def aasdfa asdfa asdfa asdfa asdfas \t asdfasdf", 20)
+	build := bytes.Buffer{}
+	for i := 0; i < 60; i++ {
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString("\t")
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString(" ")
+		build.WriteString(strconv.Itoa(i))
+		build.WriteString("\n")
+	}
+	buf := StringToBuffer(build.String(), width-1)
 	DrawLines(buf.Lines())
-	//	DrawBuffer(k)
 	termbox.SetCursor(0, 0)
 	termbox.Flush()
 
 	for {
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
-			if ev.Key == termbox.KeyCtrlC {
+			switch ev.Key {
+			case termbox.KeyCtrlC:
 				return nil
+			case termbox.KeyArrowLeft:
+				buf.MoveLeft()
+				x, y := buf.GetCursorPosition()
+				termbox.SetCursor(x, y)
+			case termbox.KeyArrowRight:
+				buf.MoveRight()
+				x, y := buf.GetCursorPosition()
+				termbox.SetCursor(x, y)
+			case termbox.KeyArrowUp:
+				buf.MoveUp()
+				x, y := buf.GetCursorPosition()
+				termbox.SetCursor(x, y)
+			case termbox.KeyArrowDown:
+				buf.MoveDown()
+				x, y := buf.GetCursorPosition()
+				termbox.SetCursor(x, y)
+			default:
+				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+				DrawLines(buf.Lines())
+				termbox.Flush()
 			}
-			termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-			DrawLines(buf.Lines())
-			termbox.Flush()
 		case termbox.EventResize:
 			termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-			DrawBuffer(k)
-			termbox.Flush()
-		case termbox.EventMouse:
-			termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-			DrawBuffer(k)
+			DrawLines(buf.Lines())
 			termbox.Flush()
 		case termbox.EventError:
 			panic(ev.Err)
