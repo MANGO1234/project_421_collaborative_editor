@@ -124,6 +124,20 @@ func InitEditor() error {
 				DrawLines(lines, height)
 				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
+			case termbox.KeyTab:
+				buf.InsertAtCurrent('\t')
+				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+				DrawLines(lines, height)
+				termbox.SetCursor(cursorX, cursorY)
+				termbox.Flush()
+			case termbox.KeyEnter:
+				buf.InsertAtCurrent('\n')
+				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+				DrawLines(lines, height)
+				termbox.SetCursor(cursorX, cursorY)
+				termbox.Flush()
 			default:
 				if ev.Ch <= 256 {
 					buf.InsertAtCurrent(byte(ev.Ch))
