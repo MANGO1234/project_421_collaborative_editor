@@ -223,8 +223,19 @@ func (buf *Buffer) MoveDown() {
 	}
 }
 
-func (buf *Buffer) GetCursorPosition() (int, int) {
-	return sliceLength(buf.currentLine.bytes[:buf.currentX+1]), buf.currentY
+func (buf *Buffer) GetDisplayInformation(screenY, height int) (int, int, int, *Line) {
+	if buf.currentY < screenY {
+		screenY = buf.currentY
+	} else if buf.currentY >= screenY+height {
+		screenY = buf.currentY - height + 1
+	}
+	cursorY := buf.currentY - screenY
+	cursorX := sliceLength(buf.currentLine.bytes[:buf.currentX+1])
+	line := buf.currentLine
+	for i := 0; i < cursorY; i++ {
+		line = line.prev
+	}
+	return screenY, cursorX, cursorY, line
 }
 
 func (buf *Buffer) Lines() *Line {

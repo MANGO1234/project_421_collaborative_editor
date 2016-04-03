@@ -32,7 +32,7 @@ func InitEditor() error {
 		return err
 	}
 
-	width, _ := termbox.Size()
+	width, height := termbox.Size()
 	termbox.SetInputMode(termbox.InputEsc)
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 	build := bytes.Buffer{}
@@ -49,6 +49,9 @@ func InitEditor() error {
 	termbox.SetCursor(0, 0)
 	termbox.Flush()
 
+	var cursorX, cursorY int
+	var lines *Line
+	screenY := 0
 	for {
 		switch ev := termbox.PollEvent(); ev.Type {
 		case termbox.EventKey:
@@ -57,23 +60,37 @@ func InitEditor() error {
 				return nil
 			case termbox.KeyArrowLeft:
 				buf.MoveLeft()
-				x, y := buf.GetCursorPosition()
-				termbox.SetCursor(x, y)
+				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+				DrawLines(lines)
+				termbox.SetCursor(cursorX, cursorY)
+				termbox.Flush()
 			case termbox.KeyArrowRight:
 				buf.MoveRight()
-				x, y := buf.GetCursorPosition()
-				termbox.SetCursor(x, y)
+				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+				DrawLines(lines)
+				termbox.SetCursor(cursorX, cursorY)
+				termbox.Flush()
 			case termbox.KeyArrowUp:
 				buf.MoveUp()
-				x, y := buf.GetCursorPosition()
-				termbox.SetCursor(x, y)
+				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+				DrawLines(lines)
+				termbox.SetCursor(cursorX, cursorY)
+				termbox.Flush()
 			case termbox.KeyArrowDown:
 				buf.MoveDown()
-				x, y := buf.GetCursorPosition()
-				termbox.SetCursor(x, y)
-			default:
+				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-				DrawLines(buf.Lines())
+				DrawLines(lines)
+				termbox.SetCursor(cursorX, cursorY)
+				termbox.Flush()
+			default:
+				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
+				DrawLines(lines)
+				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
 			}
 		case termbox.EventResize:

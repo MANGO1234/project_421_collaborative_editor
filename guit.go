@@ -6,4 +6,5 @@ import (
 
 func main() {
 	gui.InitEditor()
+	gui.CloseEditor()
 }
