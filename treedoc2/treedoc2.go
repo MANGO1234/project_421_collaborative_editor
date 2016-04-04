@@ -148,11 +148,10 @@ func InsertRoot(doc *Document, operation Operation) {
 	newNode := &DocNode{
 		Parent: nil,
 		NodeId: operation.Id,
-		Size:   1,
 	}
 	doc.Nodes[operation.Id] = newNode
 	newNode.Atoms = extendAtoms(newNode.Atoms, operation.N)
-	newNode.Atoms[operation.N] = Atom{Atom: operation.Atom, State: ALIVE}
+	newNode.Atoms[operation.N] = Atom{Atom: operation.Atom, State: ALIVE, Size: 1}
 	doc.Doc = insertNode(doc.Doc, newNode)
 	updateSize(doc, newNode, 1)
 }
@@ -164,7 +163,7 @@ func Delete(doc *Document, operation Operation) {
 	if atom.State != ALIVE {
 		panic("Atom is not alive \"" + DocToString(doc) + "\" ")
 	}
-	node.Atoms[operation.N] = Atom{State: DEAD, Atom: atom.Atom, Left: atom.Left, Size: 0}
+	node.Atoms[operation.N] = Atom{State: DEAD, Atom: atom.Atom, Left: atom.Left, Size: atom.Size - 1}
 	updateSize(doc, node, -1)
 }
 
@@ -175,8 +174,58 @@ func Insert(doc *Document, operation Operation) {
 	if atom.State != UNINITIALIZED {
 		panic("Atom is not uninitialized \"" + DocToString(doc) + "\" ")
 	}
-	node.Atoms[operation.N] = Atom{State: ALIVE, Atom: operation.Atom, Left: atom.Left, Size: 1}
+	node.Atoms[operation.N] = Atom{State: ALIVE, Atom: operation.Atom, Left: atom.Left, Size: atom.Size + 1}
 	updateSize(doc, node, 1)
+}
+
+func InsertPos(doc *Document, userId NodeId, pos int, ch byte) {
+	if doc.Size == 0 {
+
+	}
+}
+
+func DeletePos(doc *Document, pos int) {
+	acc := 0
+	var currentNode *DocNode
+	var currentN int
+
+	for _, node := range doc.Doc {
+		currentNode = node
+		if acc+node.Size > pos {
+			break
+		}
+		acc += node.Size
+	}
+
+	for i, atom := range currentNode.Atoms {
+		currentN = i
+		if acc+atom.Size > pos {
+			break
+		}
+		acc += atom.Size
+	}
+
+	for !(acc+currentNode.Atoms[currentN].Size-1 == pos && currentNode.Atoms[currentN].State == ALIVE) {
+		for _, node := range currentNode.Atoms[currentN].Left {
+			currentNode = node
+			if acc+node.Size > pos {
+				break
+			}
+			acc += node.Size
+		}
+
+		for i, atom := range currentNode.Atoms {
+			currentN = i
+			if acc+atom.Size > pos {
+				break
+			}
+			acc += atom.Size
+		}
+	}
+
+	atom := currentNode.Atoms[currentN]
+	currentNode.Atoms[currentN] = Atom{State: DEAD, Atom: atom.Atom, Left: atom.Left, Size: atom.Size - 1}
+	updateSize(doc, currentNode, -1)
 }
 
 func DocToBuffer(doc *Document) *bytes.Buffer {
@@ -206,18 +255,21 @@ func DebugDoc(doc *Document) {
 
 func debugDocHelper(disambiguator []*DocNode, indent string) {
 	for _, node := range disambiguator {
+		fmt.Print(indent + "  ")
+		fmt.Printf("(%d)\n", node.Size)
 		for _, atom := range node.Atoms {
 			debugDocHelper(atom.Left, indent+"  ")
 			if atom.State == ALIVE {
 				fmt.Print(indent)
 				fmt.Print("  ")
 				fmt.Printf("%q", atom.Atom)
-				fmt.Print(" ")
+				fmt.Printf("(%d) ", atom.Size)
 				fmt.Printf("%s\n", node.NodeId)
 			} else if atom.State == DEAD {
 				fmt.Print(indent)
 				fmt.Print(" x")
 				fmt.Printf("%q", atom.Atom)
+				fmt.Printf("(%d) ", atom.Size)
 				fmt.Print(" ")
 				fmt.Printf("%s\n", node.NodeId)
 			}

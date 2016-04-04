@@ -147,3 +147,45 @@ func TestInsertInsert(t *testing.T) {
 //	assertEqual(t, 7, x)
 //	assertEqual(t, 1, y)
 //}
+
+func TestDeletePos(t *testing.T) {
+	for i := 0; i < 8; i++ {
+		d := NewTestDoc()
+		DeletePos(d, i)
+		assertEqual(t, "cfadeghb"[:i]+"cfadeghb"[i+1:], DocToString(d))
+		assertEqual(t, 7, d.Size)
+		x, y := DocStat(d)
+		assertEqual(t, 7, x)
+		assertEqual(t, 1, y)
+	}
+
+	for i := 0; i < 7; i++ {
+		d := NewTestDoc()
+		DeletePos(d, i)
+		DeletePos(d, 6-i)
+		str := "cfadeghb"
+		str = str[:i] + str[i+1:]
+		str = str[:6-i] + str[6-i+1:]
+		assertEqual(t, str, DocToString(d))
+		assertEqual(t, 6, d.Size)
+		x, y := DocStat(d)
+		assertEqual(t, 6, x)
+		assertEqual(t, 2, y)
+	}
+
+	d := NewTestDoc()
+	assertEqual(t, "cfadeghb", DocToString(d))
+	DeletePos(d, 0)
+	assertEqual(t, "fadeghb", DocToString(d))
+	assertEqual(t, 7, d.Size)
+	x, y := DocStat(d)
+	assertEqual(t, 7, x)
+	assertEqual(t, 1, y)
+
+	DeletePos(d, 4)
+	assertEqual(t, "fadehb", DocToString(d))
+	assertEqual(t, 6, d.Size)
+	x, y = DocStat(d)
+	assertEqual(t, 6, x)
+	assertEqual(t, 2, y)
+}
