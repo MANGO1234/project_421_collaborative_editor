@@ -3,6 +3,7 @@ package treedoc2
 import (
 	"bytes"
 	"fmt"
+	"math"
 )
 
 type NodeId [20]byte
@@ -32,10 +33,11 @@ type Atom struct {
 	Left  []*DocNode
 }
 
-const INSERT_NEW byte = 0
-const INSERT_ROOT byte = 1
-const INSERT byte = 2
-const DELETE byte = 3
+const NO_OPERATION byte = 0
+const INSERT_NEW byte = 1
+const INSERT_ROOT byte = 2
+const INSERT byte = 3
+const DELETE byte = 4
 
 type Operation struct {
 	Type     byte
@@ -178,54 +180,86 @@ func Insert(doc *Document, operation Operation) {
 	updateSize(doc, node, 1)
 }
 
-func InsertPos(doc *Document, userId NodeId, pos int, ch byte) {
-	if doc.Size == 0 {
-
-	}
-}
-
-func DeletePos(doc *Document, pos int) {
-	acc := 0
-	var currentNode *DocNode
-	var currentN int
-
-	for _, node := range doc.Doc {
-		currentNode = node
+func findNodePos(pos int, acc int, nodes []*DocNode) (int, *DocNode) {
+	for _, node := range nodes {
 		if acc+node.Size > pos {
-			break
+			return acc, node
 		}
 		acc += node.Size
 	}
+	return -1, nil
+}
 
-	for i, atom := range currentNode.Atoms {
-		currentN = i
+func findAtomPos(pos int, acc int, atoms []Atom) (int, int) {
+	for i, atom := range atoms {
 		if acc+atom.Size > pos {
-			break
+			return acc, i
 		}
 		acc += atom.Size
 	}
+	return -1, 0
+}
 
-	for !(acc+currentNode.Atoms[currentN].Size-1 == pos && currentNode.Atoms[currentN].State == ALIVE) {
-		for _, node := range currentNode.Atoms[currentN].Left {
-			currentNode = node
-			if acc+node.Size > pos {
-				break
-			}
-			acc += node.Size
-		}
+func insertNewPos(currentNode *DocNode, currentN int, acc, pos int, nodeId NodeId, ch byte) {
 
-		for i, atom := range currentNode.Atoms {
-			currentN = i
-			if acc+atom.Size > pos {
-				break
-			}
-			acc += atom.Size
-		}
+}
+
+func InsertPos(doc *Document, nodeId NodeId, pos int, ch byte) Operation {
+	if doc.Size == 0 {
+		op := Operation{Type: INSERT_ROOT, Id: nodeId, N: 0, Atom: ch}
+		InsertRoot(doc, op)
+		return op
 	}
 
-	atom := currentNode.Atoms[currentN]
-	currentNode.Atoms[currentN] = Atom{State: DEAD, Atom: atom.Atom, Left: atom.Left, Size: atom.Size - 1}
-	updateSize(doc, currentNode, -1)
+	var currentNode *DocNode
+	var currentN int
+	acc := 0
+
+	acc, currentNode = findNodePos(pos, acc, doc.Doc)
+	acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
+	for {
+		if acc+currentNode.Atoms[currentN].Size-1 == pos {
+			if currentNode.Atoms[currentN].State == ALIVE {
+				if bytes.Equal(currentNode.NodeId[0:16], nodeId[0:16]) && currentN < math.MaxUint16-1 {
+					if (len(currentNode.Atoms) == currentN+1) ||
+						(currentNode.Atoms[currentN+1].State == UNINITIALIZED && currentNode.Atoms[currentN+1].Size == 0) {
+						op := Operation{Type: INSERT, Id: currentNode.NodeId, N: uint16(currentN + 1), Atom: ch}
+						Insert(doc, op)
+						return op
+					}
+				}
+				op := Operation{Type: INSERT_NEW, Id: nodeId, N: 0, Atom: ch,
+					ParentId: currentNode.NodeId, ParentN: uint16(currentN)}
+				InsertNew(doc, op)
+				return op
+			} else if currentNode.Atoms[currentN].State == UNINITIALIZED && bytes.Equal(currentNode.NodeId[0:16], nodeId[0:16]) && currentN < math.MaxUint16 {
+				op := Operation{Type: INSERT, Id: currentNode.NodeId, N: uint16(currentN), Atom: ch}
+				Insert(doc, op)
+				return op
+			}
+		}
+
+		acc, currentNode = findNodePos(pos, acc, currentNode.Atoms[currentN].Left)
+		acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
+	}
+	return Operation{Type: NO_OPERATION}
+}
+
+func DeletePos(doc *Document, pos int) Operation {
+	var currentNode *DocNode
+	var currentN int
+	acc := 0
+
+	acc, currentNode = findNodePos(pos, acc, doc.Doc)
+	acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
+	for !(acc+currentNode.Atoms[currentN].Size-1 == pos && currentNode.Atoms[currentN].State == ALIVE) {
+		acc, currentNode = findNodePos(pos, acc, currentNode.Atoms[currentN].Left)
+		acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
+	}
+
+	op := Operation{Type: DELETE, Id: currentNode.NodeId, N: uint16(currentN)}
+	Delete(doc, op)
+	return op
 }
 
 func DocToBuffer(doc *Document) *bytes.Buffer {

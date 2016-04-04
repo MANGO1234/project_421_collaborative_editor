@@ -21,6 +21,7 @@ func newId(id string) NodeId {
 
 var A_ID0 = newId("aaaaaaaaaaaaaaaa0000")
 var A_ID1 = newId("aaaaaaaaaaaaaaaa0001")
+var A_ID2 = newId("aaaaaaaaaaaaaaaa0002")
 var B_ID0 = newId("bbbbbbbbbbbbbbbb0000")
 var B_ID1 = newId("bbbbbbbbbbbbbbbb0001")
 var C_ID0 = newId("cccccccccccccccc0000")
@@ -188,4 +189,14 @@ func TestDeletePos(t *testing.T) {
 	x, y = DocStat(d)
 	assertEqual(t, 6, x)
 	assertEqual(t, 2, y)
+}
+
+func TestInsertPos(t *testing.T) {
+	for i := 0; i < 8; i++ {
+		d := NewTestDoc()
+		InsertPos(d, A_ID2, i, 'z')
+		DebugDoc(d)
+		assertEqual(t, "cfadeghb"[:i]+"z"+"cfadeghb"[i:], DocToString(d))
+		assertEqual(t, 9, d.Size)
+	}
 }
