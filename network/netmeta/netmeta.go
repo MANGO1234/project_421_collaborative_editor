@@ -1,5 +1,9 @@
 package netmeta
 
+import (
+	"encoding/json"
+)
+
 type NodeMeta struct {
 	Addr    string
 	Quitted bool
@@ -15,6 +19,11 @@ func NewLocalNetMeta(id, addr string) NetMeta {
 	netMeta := NewNetMeta()
 	netMeta[id] = Node{addr, false}
 	return netMeta
+}
+
+func (netMeta NetMeta) Has(id string) bool {
+	_, ok := netMeta[id]
+	return ok
 }
 
 // return id, newNode, true if the update results in a change and "", nil, false otherwise
@@ -39,4 +48,17 @@ func (netMeta NetMeta) Merge(netMeta2 NetMeta) (NetMeta, bool) {
 		return nil, false
 	}
 	return delta, true
+}
+
+func (netMeta NetMeta) ToJson() []byte {
+	metaJson, _ := json.Marshal(netMeta)
+	return metaJson
+}
+
+func (netMeta NetMeta) Copy() NetMeta {
+	newMeta := NewNetMeta()
+	for id, node := range netMeta {
+		newMeta[id] = node
+	}
+	return newMeta
 }

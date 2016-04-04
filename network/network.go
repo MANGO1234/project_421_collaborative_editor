@@ -12,6 +12,7 @@ package network
 import (
 	"../util"
 	"./netmeta"
+	"encoding/json"
 	"errors"
 	"github.com/satori/go.uuid"
 	"sync"
@@ -23,9 +24,17 @@ type Node struct {
 	conn *ConnWrapper
 }
 
+// get a new ConnWrapper around a connection
+func newConnWrapper(conn net.Conn) *ConnWrapper {
+	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
+	msgReader := util.MessageReader{bufio.NewReader(conn)}
+	wrapper := ConnWrapper{conn, &msgReader, &msgWriter}
+	return &wrapper
+}
+
 type Message struct {
 	Type    string
-	Visited map[string]bool
+	Visited map[string]struct{}
 	Msg     []byte
 }
 
@@ -40,6 +49,26 @@ type session struct {
 	id       string
 	listener *net.TCPListener
 	done     chan struct{}
+}
+
+// type ConnectMessage struct {
+// 	Id          string
+// 	Addr        string
+// 	NetworkMeta netmeta.NetMeta
+// 	// TODO: maybe the treedoc and versionvector
+// }
+
+// this is just a stub for a version vector that can be marshelled
+type SerializableVersionVector struct{}
+
+type VersionCheckMsgContent struct {
+	NetworkMeta   netmeta.NetMeta
+	VersionVector SerializableVersionVector
+}
+
+func (content *versionCheckMsgContent) toJson() []byte {
+	contentJson, _ := json.Marshal(content)
+	return contentJson
 }
 
 // constants
@@ -60,8 +89,10 @@ var myAddr string
 var myMsgChan chan Message
 var myBroadcastChan chan Message
 var myNetMeta netmeta.NetMeta
+var myNetMetaRWMutex sync.RWMutex
 var myConnectedNodes map[string]Node
 var myDisconnectedNodes map[string]Node
+var myConnectionMutex sync.Mutex
 var mySession *session
 
 // initialize local network listener
@@ -99,7 +130,7 @@ func (s *session) end() {
 	close(s.done)
 	s.listener.Close()
 	delta := myNetMeta.Update(s.id, netmeta.NodeMeta{myAddr, true})
-	Broadcast(msg)
+	Broadcast(createNetMetaUpdateMsg(delta))
 	// TODO disconnect all connected nodes
 	s.wg.Wait()
 }
@@ -133,8 +164,118 @@ func (s *session) listenForNewConn() {
 	}
 }
 
+func handleIncomingNetMeta(meta netmeta.NetMeta) {
+
+}
+
+// TODO: not too sure how to organize yet
+//       might want to have locks here or maybe in netmeta
+func getLatestMeta() []byte {
+	return myNetMeta.toJson()
+}
+
 func handleNewConn(conn net.Conn) {
-	// TODO
+	wrapper := newConnWrapper(conn)
+	// distinguish purpose of this connection
+	purpose, err := wrapper.reader.ReadMessage()
+	if err != nil {
+		return
+	}
+	switch purpose {
+	case "connect":
+		// send latest netmeta to the connecting node
+		latestMeta := getLatestMeta()
+		err = wrapper.writer.WriteMessageSlice(latestMeta)
+		if err != nil {
+			return
+		}
+		// retrieve the latest netmeta from the connecting node
+		msg, err := wrapper.reader.ReadMessageSlice()
+		if err != nil {
+			return
+		}
+		conn.Close()
+		var incomingMeta netmeta.NetMeta
+		err = json.Unmarshal(registrationJson, &incomingMeta)
+		if err != nil {
+			return
+		}
+		// establish persistent connection and perform any necessary broadcast
+		handleIncomingNetMeta(incomingMeta)
+	case "reconnect":
+		// TODO: actually accept persistent
+	default:
+		// invalid purpose
+		return
+	}
+}
+
+// All the following functions assume an Initialize call has been made
+func ConnectTo(remoteAddr string) (id string, err error) {
+	// start a new session if necessary
+	if mySession == nil {
+		id, err = startNewSession()
+		if err != nil {
+			return
+		}
+	}
+	id = mySession.id
+	return id, connectToHelper(remoteAddr)
+}
+
+// this method doesn't try to establish a persistent connection
+// it's goal is to register into the remote network and communicate
+// the netmeta state between the two networks
+// The actual persisting connection is to be established later
+//
+// Note on the design:
+// This design avoids infinite reconnection when a connection can be
+// established and avoids deadlock
+//
+// For example: when A and B connect to each other simutaneously,
+// with a deterministic algorithm, it's possible that the two nodes
+// performs symmetric actions, causing connections to be constantly
+// replaced and failure to agree on one single connection between
+// the nodes. If we try to use locks or channels to forbid this
+// unnecessary reconnection loop, it's easy to get deadlock. Having
+// two connections between the nodes solves this problem in a way
+// but handling two connections when we only need to handle one is
+// costly and leads to other problems associated with handling more
+// connections
+func connectToHelper(remoteAddr string) error {
+	// connect to remote node
+	conn, err := net.Dial("tcp", remoteAddr)
+	if err != nil {
+		return err
+	}
+	wrapper := newConnWrapper(conn)
+	// indicate intention to connect
+	err := wrapper.writer.WriteMessage("connect")
+	if err != nil {
+		return err
+	}
+	// retrieve latest netmeta from remote node
+	msg, err := wrapper.reader.ReadMessageSlice()
+	if err != nil {
+		return err
+	}
+	var incomingMeta netmeta.NetMeta
+	err = json.Unmarshal(registrationJson, &incomingMeta)
+	if err != nil {
+		return err
+	}
+	// send latest netmeta to the remote node
+	latestMeta := getLatestMeta()
+	wrapper.writer.WriteMessageSlice(latestMeta)
+	// The write is this node's best attempt, with the netmeta received, this node
+	// considers itself to be part of the network; Thus no error handling
+	conn.Close()
+	// establish persistent connection and perform any necessary broadcast
+	handleIncomingNetMeta(incomingMeta)
+}
+
+func (node *Node) reconnect() {
+	// TODO reconnect
 }
 
 func (s *session) periodicallyReconnectDisconnectedNodes() {
@@ -160,13 +301,26 @@ func (s *session) periodicallyCheckVersion() {
 		if s.ended() {
 			return
 		}
-		checkVersion()
+		msg := createVersionCheckMsg()
+		Broadcast(msg)
 		time.Sleep(time.Second * versionCheckInterval)
 	}
 }
 
-func checkVersion() {
-	// TODO
+func getLatestVersionVector() SerializableVersionVector {
+	// TODO: this should retrieve the latest version vector for treedoc
+	//       from somewhere
+	return nil
+}
+
+func createVersionCheckMsg() Message {
+	latestMeta := myNetMeta.Copy()
+	versionCheckMsgContent := VersionCheckMsgContent{
+		latestMeta,
+		getLatestVersionVector(),
+	}
+	content := versionCheckMsgContent.toJson()
+	return NewSyncMessage(msgTypeVersionCheck, content)
 }
 
 func serveIncomingMessages(in <-chan Message) {
@@ -179,6 +333,26 @@ func serveBroadcastRequests(in <-chan Message) {
 	for msg := range in {
 		Broadcast(msg)
 	}
+}
+
+func NewSyncMessage(msgType string, content []byte) {
+	return Message{
+		msgType,
+		nil,
+		content,
+	}
+}
+
+func NewBroadcastMessage(msgType string, content []byte) {
+	return Message{
+		msgType,
+		make(map[string]struct{}),
+		content,
+	}
+}
+
+func createNetMetaUpdateMsg(meta netmeta.NetMeta) Message {
+	return NewBroadcastMessage(msgTypeNetMetaUpdate, meta.ToJson())
 }
 
 // Disconnect from the network voluntarily
@@ -198,14 +372,6 @@ func Reconnect() (string, error) {
 	return startNewSession()
 }
 
-// All the following functions assume an Initialize call has been made
-func ConnectTo(remoteAddr string) error {
-	if mySession == nil {
-		startNewSession() //TODO
-	}
-	// TODO
-}
-
 func BroadcastAsync(msg Message) {
 	go func() {
 		myBroadcastChan <- msg
@@ -217,5 +383,5 @@ func Broadcast(msg Message) {
 }
 
 func GetNetworkMetadata() string {
-	// TODO
+	return string(myNetMeta.ToJson())
 }
