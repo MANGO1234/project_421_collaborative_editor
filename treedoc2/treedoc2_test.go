@@ -191,12 +191,49 @@ func TestDeletePos(t *testing.T) {
 	assertEqual(t, 2, y)
 }
 
-func TestInsertPos(t *testing.T) {
-	for i := 0; i < 8; i++ {
-		d := NewTestDoc()
-		InsertPos(d, A_ID2, i, 'z')
-		DebugDoc(d)
-		assertEqual(t, "cfadeghb"[:i]+"z"+"cfadeghb"[i:], DocToString(d))
-		assertEqual(t, 9, d.Size)
-	}
+func TestBufferOperationReturn(t *testing.T) {
+	d := NewTestDoc()
+	DebugDoc(d)
+	op := ApplyOperation(d, Operation{Type: DELETE, Id: C_ID1, N: 1})
+	assertEqual(t, DELETE, op.Type)
+	assertEqual(t, 5, op.Pos)
+	op = ApplyOperation(d, Operation{Type: DELETE, Id: C_ID0, N: 0})
+	assertEqual(t, DELETE, op.Type)
+	assertEqual(t, 0, op.Pos)
+
+	d = NewDocument()
+	op = ApplyOperation(d, Operation{Type: INSERT_ROOT, Atom: 'a', Id: A_ID0, N: 0})
+	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, 0, op.Pos)
+	op = ApplyOperation(d, Operation{Type: INSERT_ROOT, Atom: 'b', Id: B_ID0, N: 0})
+	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, 1, op.Pos)
+	op = ApplyOperation(d, Operation{Type: INSERT_NEW, Atom: 'c', ParentId: A_ID0, ParentN: 0, Id: C_ID0, N: 0})
+	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, 0, op.Pos)
+	op = ApplyOperation(d, Operation{Type: INSERT_NEW, Atom: 'd', ParentId: A_ID0, ParentN: 1, Id: C_ID1, N: 0})
+	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, 2, op.Pos)
+	op = ApplyOperation(d, Operation{Type: INSERT_NEW, Atom: 'e', ParentId: C_ID1, ParentN: 1, Id: D_ID0, N: 0})
+	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, 3, op.Pos)
+	op = ApplyOperation(d, Operation{Type: INSERT, Atom: 'f', Id: C_ID0, N: 1})
+	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, 1, op.Pos)
+	op = ApplyOperation(d, Operation{Type: INSERT, Atom: 'g', Id: C_ID1, N: 1})
+	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, 5, op.Pos)
+	op = ApplyOperation(d, Operation{Type: INSERT, Atom: 'h', Id: C_ID1, N: 2})
+	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, 6, op.Pos)
 }
+
+//func TestInsertPos(t *testing.T) {
+//	for i := 0; i < 8; i++ {
+//		d := NewTestDoc()
+//		InsertPos(d, A_ID2, i, 'z')
+//		DebugDoc(d)
+//		assertEqual(t, "cfadeghb"[:i]+"z"+"cfadeghb"[i:], DocToString(d))
+//		assertEqual(t, 9, d.Size)
+//	}
+//}

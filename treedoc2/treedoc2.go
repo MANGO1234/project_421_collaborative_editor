@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math"
+	"strconv"
 )
 
 type NodeId [20]byte
@@ -48,10 +49,17 @@ type Operation struct {
 	Atom     byte
 }
 
+type BufferOperation struct {
+	Type byte
+	Pos  int
+	Atom byte
+}
+
 func NewDocument() *Document {
 	return &Document{Doc: make([]*DocNode, 0, 4), Nodes: make(map[NodeId]*DocNode)}
 }
 
+// insert a node in sorted nodeId order into the slice
 func insertNode(disambiguator []*DocNode, node *DocNode) []*DocNode {
 	if disambiguator == nil {
 		a := make([]*DocNode, 1, 4)
@@ -74,6 +82,7 @@ func insertNode(disambiguator []*DocNode, node *DocNode) []*DocNode {
 	return disambiguator
 }
 
+// just ensure the atom slice has enough elements to prevent out of index error
 func extendAtoms(atoms []Atom, i uint16) []Atom {
 	if atoms == nil {
 		return make([]Atom, i+1, i+5)
@@ -93,16 +102,17 @@ func insertAtom(atoms []Atom, atom Atom, i uint16) []Atom {
 	return atoms
 }
 
-func ApplyOperation(doc *Document, operation Operation) {
+func ApplyOperation(doc *Document, operation Operation) BufferOperation {
 	if operation.Type == INSERT_NEW {
-		InsertNew(doc, operation)
+		return InsertNew(doc, operation)
 	} else if operation.Type == INSERT {
-		Insert(doc, operation)
+		return Insert(doc, operation)
 	} else if operation.Type == DELETE {
-		Delete(doc, operation)
+		return Delete(doc, operation)
 	} else if operation.Type == INSERT_ROOT {
-		InsertRoot(doc, operation)
+		return InsertRoot(doc, operation)
 	}
+	return BufferOperation{Type: NO_OPERATION}
 }
 
 func updateSize(doc *Document, node *DocNode, delta int) {
@@ -121,7 +131,29 @@ func updateSize(doc *Document, node *DocNode, delta int) {
 	}
 }
 
-func InsertNew(doc *Document, operation Operation) {
+func calcPosHelper(doc *Document, node *DocNode, n int) int {
+	acc := 0
+	for i := 0; i < n; i++ {
+		acc += node.Atoms[i].Size
+	}
+	if node.Parent == nil {
+		for _, rootNode := range doc.Doc {
+			if rootNode == node {
+				break
+			}
+			acc += rootNode.Size
+		}
+		return acc
+	}
+	return acc + calcPosHelper(doc, node.Parent, int(node.ParentN))
+}
+
+// calculate the position of the atom given its parent node and its n
+func calcPos(doc *Document, node *DocNode, n int) int {
+	return calcPosHelper(doc, node, n) + node.Atoms[n].Size - 1
+}
+
+func InsertNew(doc *Document, operation Operation) BufferOperation {
 	parent := doc.Nodes[operation.ParentId]
 	newNode := &DocNode{
 		NodeId:  operation.Id,
@@ -144,9 +176,11 @@ func InsertNew(doc *Document, operation Operation) {
 		Left:  insertNode(atom.Left, newNode),
 	}
 	updateSize(doc, newNode, 1)
+	pos := calcPos(doc, newNode, int(operation.N))
+	return BufferOperation{Type: INSERT, Pos: pos, Atom: operation.Atom}
 }
 
-func InsertRoot(doc *Document, operation Operation) {
+func InsertRoot(doc *Document, operation Operation) BufferOperation {
 	newNode := &DocNode{
 		Parent: nil,
 		NodeId: operation.Id,
@@ -156,20 +190,24 @@ func InsertRoot(doc *Document, operation Operation) {
 	newNode.Atoms[operation.N] = Atom{Atom: operation.Atom, State: ALIVE, Size: 1}
 	doc.Doc = insertNode(doc.Doc, newNode)
 	updateSize(doc, newNode, 1)
+	pos := calcPos(doc, newNode, int(operation.N))
+	return BufferOperation{Type: INSERT, Pos: pos, Atom: operation.Atom}
 }
 
-func Delete(doc *Document, operation Operation) {
+func Delete(doc *Document, operation Operation) BufferOperation {
 	node := doc.Nodes[operation.Id]
 	node.Atoms = extendAtoms(node.Atoms, operation.N)
 	atom := node.Atoms[operation.N]
 	if atom.State != ALIVE {
 		panic("Atom is not alive \"" + DocToString(doc) + "\" ")
 	}
+	pos := calcPos(doc, node, int(operation.N))
 	node.Atoms[operation.N] = Atom{State: DEAD, Atom: atom.Atom, Left: atom.Left, Size: atom.Size - 1}
 	updateSize(doc, node, -1)
+	return BufferOperation{Type: DELETE, Pos: pos}
 }
 
-func Insert(doc *Document, operation Operation) {
+func Insert(doc *Document, operation Operation) BufferOperation {
 	node := doc.Nodes[operation.Id]
 	node.Atoms = extendAtoms(node.Atoms, operation.N)
 	atom := node.Atoms[operation.N]
@@ -178,6 +216,8 @@ func Insert(doc *Document, operation Operation) {
 	}
 	node.Atoms[operation.N] = Atom{State: ALIVE, Atom: operation.Atom, Left: atom.Left, Size: atom.Size + 1}
 	updateSize(doc, node, 1)
+	pos := calcPos(doc, node, int(operation.N))
+	return BufferOperation{Type: INSERT, Pos: pos, Atom: operation.Atom}
 }
 
 func findNodePos(pos int, acc int, nodes []*DocNode) (int, *DocNode) {
@@ -262,6 +302,9 @@ func DeletePos(doc *Document, pos int) Operation {
 	return op
 }
 
+// ***********************************************************
+// *************** Miscellaneous *****************************
+// ***********************************************************
 func DocToBuffer(doc *Document) *bytes.Buffer {
 	var buf bytes.Buffer
 	return docToBufferHelper(doc.Doc, &buf)
@@ -348,4 +391,12 @@ func docStat(disambiguator []*DocNode) (int, int) {
 		}
 	}
 	return alive, dead
+}
+
+func AtomToString(atom Atom) string {
+	var buf bytes.Buffer
+	buf.WriteString(strconv.Itoa(int(atom.Atom)))
+	buf.WriteString(" " + strconv.Itoa(int(atom.Size)))
+	buf.WriteString(" " + strconv.Itoa(int(atom.State)))
+	return buf.String()
 }
