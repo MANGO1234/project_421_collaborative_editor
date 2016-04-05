@@ -22,6 +22,7 @@ func newId(id string) NodeId {
 var A_ID0 = newId("aaaaaaaaaaaaaaaa0000")
 var A_ID1 = newId("aaaaaaaaaaaaaaaa0001")
 var A_ID2 = newId("aaaaaaaaaaaaaaaa0002")
+var A_ID3 = newId("aaaaaaaaaaaaaaaa0003")
 var B_ID0 = newId("bbbbbbbbbbbbbbbb0000")
 var B_ID1 = newId("bbbbbbbbbbbbbbbb0001")
 var C_ID0 = newId("cccccccccccccccc0000")
@@ -227,12 +228,24 @@ func TestBufferOperationReturn(t *testing.T) {
 	assertEqual(t, 6, op.Pos)
 }
 
-//func TestInsertPos(t *testing.T) {
-//	for i := 0; i < 8; i++ {
-//		d := NewTestDoc()
-//		InsertPos(d, A_ID2, i, 'z')
-//		DebugDoc(d)
-//		assertEqual(t, "cfadeghb"[:i]+"z"+"cfadeghb"[i:], DocToString(d))
-//		assertEqual(t, 9, d.Size)
-//	}
-//}
+func TestInsertPos(t *testing.T) {
+	for i := 0; i < 9; i++ {
+		d := NewTestDoc()
+		InsertPos(d, A_ID2, i, 'z')
+		assertEqual(t, "cfadeghb"[:i]+"z"+"cfadeghb"[i:], DocToString(d))
+		assertEqual(t, 9, d.Size)
+	}
+	for i := 0; i < 9; i++ {
+		for j := 0; j < 10; j++ {
+			d := NewTestDoc()
+			str := "cfadeghb"
+			InsertPos(d, A_ID2, i, 'z')
+			str = str[:i] + "z" + str[i:]
+			assertEqual(t, str, DocToString(d))
+			InsertPos(d, A_ID3, j, 'y')
+			str = str[:j] + "y" + str[j:]
+			assertEqual(t, str, DocToString(d))
+			assertEqual(t, 10, d.Size)
+		}
+	}
+}
