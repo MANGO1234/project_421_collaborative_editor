@@ -76,9 +76,9 @@ func (content *versionCheckMsgContent) toJson() []byte {
 // how often to check version vector and network metadata in seconds
 const (
 	// how often to check if version on two nodes match
-	versionCheckInterval = 30
+	versionCheckInterval = 30 * time.Second
 	// how often to check whether it's time to (re)connect to disconnected nodes
-	reconnectInterval = 30
+	reconnectInterval = 30 * time.Second
 )
 
 // message types of messages sent to existing connection
@@ -87,16 +87,6 @@ const (
 	msgTypeSync          = "sync"
 	msgTypeNetMetaUpdate = "netmeta"
 	msgTypeTreedocOp     = "treedocOp"
-)
-
-// the purpose of dialing to a node
-const (
-	// client-initiated call to connect to a remote node
-	dialingTypeRegister = "register"
-	// poke a known node so it has information to connect
-	dialingTypePoke = "poke"
-	// establish persistent connection between the nodes
-	dialingTypeEstablishConnection = "connect"
 )
 
 // states to keep track of
@@ -109,19 +99,6 @@ var myConnectedNodes map[string]Node
 var myDisconnectedNodes map[string]Node
 var myConnectionMutex sync.Mutex
 var mySession *session
-
-// initialize local network listener
-func Initialize(addr string) (string, error) {
-	myAddr = addr
-	myBroadcastChan = make(chan Message, 15)
-	myMsgChan = make(chan Message)
-	myNetMeta = netmeta.NewNetMeta()
-	myConnectedNodes = make(map[string]Node)
-	myDisconnectedNodes = make(map[string]Node)
-	go serveBroadcastRequests(myBroadcastChan)
-	go serveIncomingMessages(myMsgChan)
-	return startNewSession(addr)
-}
 
 func (s *session) ended() bool {
 	select {
@@ -189,149 +166,6 @@ func getLatestMeta() []byte {
 	return myNetMeta.toJson()
 }
 
-func handleNewConn(conn net.Conn) {
-	defer conn.Close()
-	wrapper := newConnWrapper(conn)
-	// distinguish purpose of this connection
-	purpose, err := wrapper.reader.ReadMessage()
-	if err != nil {
-		return
-	}
-	switch purpose {
-	case dialingTypePoke:
-		expectedId, err := wrapper.reader.ReadMessage()
-		if err != nil {
-			return
-		}
-		if expectedId == mySession.id {
-			err = wrapper.writer.WriteMessageSlice("true")
-			if err != nil {
-				return
-			}
-		} else {
-			wrapper.writer.WriteMessageSlice("false")
-			return
-		}
-		fallthrough
-	case dialingTypeRegister:
-		// send latest netmeta to the connecting node
-		latestMeta := getLatestMeta()
-		err = wrapper.writer.WriteMessageSlice(latestMeta)
-		if err != nil {
-			return
-		}
-		// retrieve the latest netmeta from the connecting node
-		msg, err := wrapper.reader.ReadMessageSlice()
-		if err != nil {
-			return
-		}
-		conn.Close()
-		var incomingMeta netmeta.NetMeta
-		err = json.Unmarshal(registrationJson, &incomingMeta)
-		if err != nil {
-			return
-		}
-		// establish persistent connection and perform any necessary broadcast
-		handleIncomingNetMeta(incomingMeta)
-	case dialingTypeEstablishConnection:
-		// TODO: actually accept persistent
-	default:
-		// invalid purpose
-		return
-	}
-}
-
-// All the following functions assume an Initialize call has been made
-func ConnectTo(remoteAddr string) (id string, err error) {
-	// start a new session if necessary
-	if mySession == nil {
-		id, err = startNewSession()
-		if err != nil {
-			return
-		}
-	}
-	id = mySession.id
-	return id, register(remoteAddr)
-}
-
-func register(remoteAddr string) error {
-	return registerOrPokeHelper("", remoteAddr)
-}
-
-// this method doesn't try to establish a persistent connection
-// it's goal is to register into the remote network and communicate
-// the netmeta state between the two networks
-// The actual persisting connection is to be established later
-//
-// Note on the design:
-// This design avoids infinite reconnection when a connection can be
-// established and avoids deadlock
-//
-// For example: when A and B connect to each other simutaneously,
-// with a deterministic algorithm, it's possible that the two nodes
-// performs symmetric actions, causing connections to be constantly
-// replaced and failure to agree on one single connection between
-// the nodes. If we try to use locks or channels to forbid this
-// unnecessary reconnection loop, it's easy to get deadlock. Having
-// two connections between the nodes solves this problem in a way
-// but handling two connections when we only need to handle one is
-// costly and leads to other problems associated with handling more
-// connections
-func registerOrPokeHelper(id, remoteAddr string) error {
-	// connect to remote node
-	conn, err := net.Dial("tcp", remoteAddr)
-	if err != nil {
-		return err
-	}
-	defer conn.Close()
-	wrapper := newConnWrapper(conn)
-	// indicate intention of this dial
-	var intention string
-	if id == "" {
-		intention = dialingTypeRegister
-	} else {
-		intention = dialingTypePoke
-	}
-	err = wrapper.writer.WriteMessage(intention)
-	if err != nil {
-		return err
-	}
-	// when poking, we need to make sure the other node has the expected id
-	// if it doesn't we should treat the node associated the id as quitted
-	if intention == dialingTypePoke {
-		err = wrapper.writer.WriteMessage(id)
-		if err != nil {
-			return err
-		}
-		match, err := wrapper.reader.ReadMessage()
-		if err != nil {
-			return err
-		}
-		if match == "false" {
-			// TODO: mark node as deleted
-			return nil
-		}
-	}
-	// retrieve latest netmeta from remote node
-	msg, err := wrapper.reader.ReadMessageSlice()
-	if err != nil {
-		return err
-	}
-	var incomingMeta netmeta.NetMeta
-	err = json.Unmarshal(registrationJson, &incomingMeta)
-	if err != nil {
-		return err
-	}
-	// send latest netmeta to the remote node
-	latestMeta := getLatestMeta()
-	wrapper.writer.WriteMessageSlice(latestMeta)
-	// The write is this node's best attempt, with the netmeta received, this node
-	// considers itself to be part of the network; Thus no error handling
-	conn.Close()
-	// establish persistent connection and perform any necessary broadcast
-	handleIncomingNetMeta(incomingMeta)
-}
-
 func (node *Node) reconnect() {
 	// TODO reconnect
 }
@@ -344,7 +178,7 @@ func (s *session) periodicallyReconnectDisconnectedNodes() {
 			return
 		}
 		reconnectDisconnectedNodes()
-		time.Sleep(time.Second * reconnectInterval)
+		time.Sleep(reconnectInterval)
 	}
 }
 
@@ -361,7 +195,7 @@ func (s *session) periodicallyCheckVersion() {
 		}
 		msg := createVersionCheckMsg()
 		Broadcast(msg)
-		time.Sleep(time.Second * versionCheckInterval)
+		time.Sleep(versionCheckInterval)
 	}
 }
 
@@ -411,35 +245,4 @@ func NewBroadcastMessage(msgType string, content []byte) {
 
 func createNetMetaUpdateMsg(meta netmeta.NetMeta) Message {
 	return NewBroadcastMessage(msgTypeNetMetaUpdate, meta.ToJson())
-}
-
-// Disconnect from the network voluntarily
-func Disconnect() error {
-	if mySession == nil {
-		return errors.New("Already disconnected")
-	}
-	mySession.end()
-	mySession = nil
-}
-
-// Re-initialize node with new UUID.
-func Reconnect() (string, error) {
-	if mySession != nil {
-		return "", errors.New("The node is already connected!")
-	}
-	return startNewSession()
-}
-
-func BroadcastAsync(msg Message) {
-	go func() {
-		myBroadcastChan <- msg
-	}()
-}
-
-func Broadcast(msg Message) {
-	// TODO
-}
-
-func GetNetworkMetadata() string {
-	return string(myNetMeta.ToJson())
 }
