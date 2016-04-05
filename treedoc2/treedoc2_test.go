@@ -193,7 +193,6 @@ func TestDeletePos(t *testing.T) {
 
 func TestBufferOperationReturn(t *testing.T) {
 	d := NewTestDoc()
-	DebugDoc(d)
 	op := ApplyOperation(d, Operation{Type: DELETE, Id: C_ID1, N: 1})
 	assertEqual(t, DELETE, op.Type)
 	assertEqual(t, 5, op.Pos)

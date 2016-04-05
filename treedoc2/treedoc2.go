@@ -153,6 +153,10 @@ func calcPos(doc *Document, node *DocNode, n int) int {
 	return calcPosHelper(doc, node, n) + node.Atoms[n].Size - 1
 }
 
+// ***************************************************************************************
+// ******************** Operations On Treedoc (Remote operations) ************************
+// ***************************************************************************************
+
 func InsertNew(doc *Document, operation Operation) BufferOperation {
 	parent := doc.Nodes[operation.ParentId]
 	newNode := &DocNode{
@@ -220,6 +224,10 @@ func Insert(doc *Document, operation Operation) BufferOperation {
 	return BufferOperation{Type: INSERT, Pos: pos, Atom: operation.Atom}
 }
 
+// ***************************************************************************************
+// ******************** Operations From buffer (Local operations) ************************
+// ***************************************************************************************
+
 func findNodePos(pos int, acc int, nodes []*DocNode) (int, *DocNode) {
 	for _, node := range nodes {
 		if acc+node.Size > pos {
@@ -240,9 +248,26 @@ func findAtomPos(pos int, acc int, atoms []Atom) (int, int) {
 	return -1, 0
 }
 
-func insertNewPos(currentNode *DocNode, currentN int, acc, pos int, nodeId NodeId, ch byte) {
-
+func posToIdForDel(nodes []*DocNode, pos int) (*DocNode, int) {
+	var currentN int
+	acc, currentNode := findNodePos(pos, 0, nodes)
+	acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
+	for !(acc+currentNode.Atoms[currentN].Size-1 == pos && currentNode.Atoms[currentN].State == ALIVE) {
+		acc, currentNode = findNodePos(pos, acc, currentNode.Atoms[currentN].Left)
+		acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
+	}
+	return currentNode, currentN
 }
+
+//func findPosForInsert(nodes []*DocNode, pos int, nodeId NodeId, ch byte) {
+//	acc, currentNode := findNodePos(pos, 0, nodes)
+//	var currentN int
+//	if bytes.Equal(currentNode.NodeId[0:16], nodeId[0:16]) {
+//
+//	} else {
+//		acc, currentN = findAtomPos(0, acc, currentNode.Atoms)
+//	}
+//}
 
 func InsertPos(doc *Document, nodeId NodeId, pos int, ch byte) Operation {
 	if doc.Size == 0 {
@@ -286,18 +311,8 @@ func InsertPos(doc *Document, nodeId NodeId, pos int, ch byte) Operation {
 }
 
 func DeletePos(doc *Document, pos int) Operation {
-	var currentNode *DocNode
-	var currentN int
-	acc := 0
-
-	acc, currentNode = findNodePos(pos, acc, doc.Doc)
-	acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
-	for !(acc+currentNode.Atoms[currentN].Size-1 == pos && currentNode.Atoms[currentN].State == ALIVE) {
-		acc, currentNode = findNodePos(pos, acc, currentNode.Atoms[currentN].Left)
-		acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
-	}
-
-	op := Operation{Type: DELETE, Id: currentNode.NodeId, N: uint16(currentN)}
+	node, n := posToIdForDel(doc.Doc, pos)
+	op := Operation{Type: DELETE, Id: node.NodeId, N: uint16(n)}
 	Delete(doc, op)
 	return op
 }
