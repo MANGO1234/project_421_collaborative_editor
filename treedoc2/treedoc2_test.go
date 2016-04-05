@@ -162,17 +162,20 @@ func TestDeletePos(t *testing.T) {
 	}
 
 	for i := 0; i < 7; i++ {
-		d := NewTestDoc()
-		DeletePos(d, i)
-		DeletePos(d, 6-i)
-		str := "cfadeghb"
-		str = str[:i] + str[i+1:]
-		str = str[:6-i] + str[6-i+1:]
-		assertEqual(t, str, DocToString(d))
-		assertEqual(t, 6, d.Size)
-		x, y := DocStat(d)
-		assertEqual(t, 6, x)
-		assertEqual(t, 2, y)
+		for j := 0; j < 6; j++ {
+			d := NewTestDoc()
+			str := "cfadeghb"
+			DeletePos(d, i)
+			str = str[:i] + str[i+1:]
+			assertEqual(t, str, DocToString(d))
+			DeletePos(d, j)
+			str = str[:j] + str[j+1:]
+			assertEqual(t, str, DocToString(d))
+			assertEqual(t, 6, d.Size)
+			x, y := DocStat(d)
+			assertEqual(t, 6, x)
+			assertEqual(t, 2, y)
+		}
 	}
 
 	d := NewTestDoc()
@@ -235,6 +238,7 @@ func TestInsertPos(t *testing.T) {
 		assertEqual(t, "cfadeghb"[:i]+"z"+"cfadeghb"[i:], DocToString(d))
 		assertEqual(t, 9, d.Size)
 	}
+
 	for i := 0; i < 9; i++ {
 		for j := 0; j < 10; j++ {
 			d := NewTestDoc()
