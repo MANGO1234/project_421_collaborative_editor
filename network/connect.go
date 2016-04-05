@@ -2,7 +2,7 @@ package network
 
 import (
 	"encoding/json"
-	"errors"
+	"net"
 )
 
 // Note on the design:
@@ -67,16 +67,16 @@ func handleNewConn(conn net.Conn) {
 			return
 		}
 		if expectedId == mySession.id {
-			err = wrapper.writer.WriteMessageSlice("true")
+			err = wrapper.writer.WriteMessage("true")
 			if err != nil {
 				return
 			}
 		} else {
-			wrapper.writer.WriteMessageSlice("false")
+			wrapper.writer.WriteMessage("false")
 			return
 		}
 		fallthrough
-	case dialingTypeRegister:
+	case dialingTypeClientPoke:
 		// send latest netmeta to the connecting node
 		latestMeta := getLatestMeta()
 		err = wrapper.writer.WriteMessageSlice(latestMeta)
@@ -89,15 +89,16 @@ func handleNewConn(conn net.Conn) {
 			return
 		}
 		conn.Close()
-		var incomingMeta netmeta.NetMeta
-		err = json.Unmarshal(registrationJson, &incomingMeta)
+		var incomingMeta NetMeta
+		err = json.Unmarshal(msg, &incomingMeta)
 		if err != nil {
 			return
 		}
 		// establish persistent connection and perform any necessary broadcast
 		handleIncomingNetMeta(incomingMeta)
-	case dialingTypeEstablishConnection:
+	case dialingTypeConnect:
 		// TODO: actually accept persistent
+	case dialingTypeClientConnect:
 	default:
 		// invalid purpose
 		return
@@ -115,7 +116,7 @@ func registerOrPokeHelper(id, remoteAddr string) error {
 	// indicate intention of this dial
 	var intention string
 	if id == "" {
-		intention = dialingTypeRegister
+		intention = dialingTypeClientPoke
 	} else {
 		intention = dialingTypePoke
 	}
@@ -144,8 +145,8 @@ func registerOrPokeHelper(id, remoteAddr string) error {
 	if err != nil {
 		return err
 	}
-	var incomingMeta netmeta.NetMeta
-	err = json.Unmarshal(registrationJson, &incomingMeta)
+	var incomingMeta NetMeta
+	err = json.Unmarshal(msg, &incomingMeta)
 	if err != nil {
 		return err
 	}
@@ -157,4 +158,5 @@ func registerOrPokeHelper(id, remoteAddr string) error {
 	conn.Close()
 	// establish persistent connection and perform any necessary broadcast
 	handleIncomingNetMeta(incomingMeta)
+	return nil
 }

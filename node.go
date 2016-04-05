@@ -9,11 +9,11 @@ package main
 import (
 	"./network"
 	// "./treedoc"
+	"./treedocmanager"
 	"./util"
 	"bufio"
 	"fmt"
 	"os"
-	"./treedocmanager"
 )
 
 func main() {
@@ -27,9 +27,7 @@ func main() {
 	treedocmanager.CreateTreedoc(nodeId)
 	// TODO: link cursor position and treedoc posID
 
-
 	util.CheckError(err)
-
 
 	fmt.Print("> ")
 	scanner := bufio.NewScanner(os.Stdin)
@@ -40,7 +38,8 @@ func main() {
 			fmt.Print("connect > ")
 			scanner.Scan()
 			remoteAddr := scanner.Text()
-			err = network.ConnectTo(remoteAddr)
+			id, err := network.ConnectTo(remoteAddr)
+			fmt.Println("my id:", id)
 			util.PrintError(err) // TODO deal with err
 		case "disconnect":
 			// TODO: disconnect to the network

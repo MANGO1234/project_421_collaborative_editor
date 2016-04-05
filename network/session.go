@@ -1,14 +1,18 @@
 package network
 
 import (
-	"../util"
-	"./netmeta"
-	"encoding/json"
-	"errors"
 	"github.com/satori/go.uuid"
+	"net"
 	"sync"
 	"time"
 )
+
+type session struct {
+	sync.WaitGroup
+	id       string
+	listener *net.TCPListener
+	done     chan struct{}
+}
 
 func (s *session) ended() bool {
 	select {
@@ -19,36 +23,35 @@ func (s *session) ended() bool {
 	}
 }
 
-func getNewSession(listener *net.TCPListener) *session {
-	s := session{uuid.NewV1().String(), listener, make(chan struct{})}
-	myNetMeta.Update(s.id, netmeta.NodeMeta{myAddr, false})
-	go s.listenForNewConn()
-	go s.periodicallyReconnectDisconnectedNodes()
-	go s.periodicallyCheckVersion()
-	return s
+func startNewSession(addr string) (*session, error) {
+	lAddr, err := net.ResolveTCPAddr("tcp", addr)
+	if err != nil {
+		return nil, err
+	}
+	listener, err := net.ListenTCP("tcp", lAddr)
+	if err != nil {
+		return nil, err
+	}
+	//util.Debug("listening on ", lAddr.String())
+	newSession := session{
+		id:       uuid.NewV1().String(),
+		listener: listener,
+		done:     make(chan struct{}),
+	}
+	myNetMeta.Update(newSession.id, NodeMeta{addr, false})
+	go newSession.listenForNewConn()
+	go newSession.periodicallyReconnectDisconnectedNodes()
+	go newSession.periodicallyCheckVersion()
+	return &newSession, nil
 }
 
 func (s *session) end() {
 	close(s.done)
 	s.listener.Close()
-	delta := myNetMeta.Update(s.id, netmeta.NodeMeta{myAddr, true})
+	delta, _ := myNetMeta.Merge(NewQuitNetMeta(s.id, myAddr))
 	Broadcast(createNetMetaUpdateMsg(delta))
 	// TODO disconnect all connected nodes
-	s.wg.Wait()
-}
-
-func startNewSession() (string, error) {
-	lAddr, err := net.ResolveTCPAddr("tcp", myAddr)
-	if err != nil {
-		return "", err
-	}
-	listener, err := net.ListenTCP("tcp", lAddr)
-	if err != nil {
-		return "", err
-	}
-	//util.Debug("listening on ", lAddr.String())
-	mySession = getNewSession(listener)
-	return mySession.id, nil
+	s.Wait()
 }
 
 // These functions launches major network threads
@@ -66,14 +69,10 @@ func (s *session) listenForNewConn() {
 	}
 }
 
-func handleIncomingNetMeta(meta netmeta.NetMeta) {
-
-}
-
 // TODO: not too sure how to organize yet
 //       might want to have locks here or maybe in netmeta
 func getLatestMeta() []byte {
-	return myNetMeta.toJson()
+	return myNetMeta.ToJson()
 }
 
 func (node *Node) reconnect() {
@@ -112,7 +111,7 @@ func (s *session) periodicallyCheckVersion() {
 func getLatestVersionVector() SerializableVersionVector {
 	// TODO: this should retrieve the latest version vector for treedoc
 	//       from somewhere
-	return nil
+	return SerializableVersionVector{}
 }
 
 func createVersionCheckMsg() Message {

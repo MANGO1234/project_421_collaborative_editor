@@ -1,17 +1,23 @@
 package network
 
-// Initialize initialize the network module, it's meant to be called before
-// calling any other function provided by this package
+import (
+	"errors"
+)
+
+// Initialize initialize the network module, it's meant to be called once
+// before calling any other function provided by this package
 func Initialize(addr string) (string, error) {
 	myAddr = addr
 	myBroadcastChan = make(chan Message, 15)
 	myMsgChan = make(chan Message)
-	myNetMeta = netmeta.NewNetMeta()
+	myNetMeta = NewNetMeta()
 	myConnectedNodes = make(map[string]Node)
 	myDisconnectedNodes = make(map[string]Node)
 	go serveBroadcastRequests(myBroadcastChan)
 	go serveIncomingMessages(myMsgChan)
-	return startNewSession(addr)
+	var err error
+	mySession, err = startNewSession(addr)
+	return mySession.id, err
 }
 
 // ConnectTo registers the current node into the network of the node
@@ -19,7 +25,7 @@ func Initialize(addr string) (string, error) {
 func ConnectTo(remoteAddr string) (id string, err error) {
 	// start a new session if necessary
 	if mySession == nil {
-		id, err = startNewSession()
+		mySession, err = startNewSession(myAddr)
 		if err != nil {
 			return
 		}
@@ -35,6 +41,7 @@ func Disconnect() error {
 	}
 	mySession.end()
 	mySession = nil
+	return nil
 }
 
 // Re-initialize node with new UUID.
@@ -42,7 +49,12 @@ func Reconnect() (string, error) {
 	if mySession != nil {
 		return "", errors.New("The node is already connected!")
 	}
-	return startNewSession()
+	var err error
+	mySession, err = startNewSession(myAddr)
+	if err != nil {
+		return "", err
+	}
+	return mySession.id, err
 }
 
 func BroadcastAsync(msg Message) {

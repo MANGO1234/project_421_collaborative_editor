@@ -1,4 +1,4 @@
-package netmeta
+package network
 
 import (
 	"encoding/json"
@@ -15,9 +15,15 @@ func NewNetMeta() NetMeta {
 	return make(map[string]NodeMeta)
 }
 
-func NewLocalNetMeta(id, addr string) NetMeta {
+func NewQuitNetMeta(id, addr string) NetMeta {
 	netMeta := NewNetMeta()
-	netMeta[id] = Node{addr, false}
+	netMeta[id] = NodeMeta{addr, true}
+	return netMeta
+}
+
+func NewJoinNetMeta(id, addr string) NetMeta {
+	netMeta := NewNetMeta()
+	netMeta[id] = NodeMeta{addr, false}
 	return netMeta
 }
 
@@ -27,21 +33,21 @@ func (netMeta NetMeta) Has(id string) bool {
 }
 
 // return id, newNode, true if the update results in a change and "", nil, false otherwise
-func (netMeta NetMeta) Update(id string, newNode NodeMeta) (string, NodeMeta, bool) {
+func (netMeta NetMeta) Update(id string, newNode NodeMeta) bool {
 	if node, ok := netMeta[id]; !ok || (!node.Quitted && newNode.Quitted) {
 		netMeta[id] = newNode
-		return id, newNode, true
+		return true
 	}
-	return "", nil, false
+	return false
 }
 
 // return the changes resulting from merge
 func (netMeta NetMeta) Merge(netMeta2 NetMeta) (NetMeta, bool) {
 	delta := NewNetMeta()
 	for id, node := range netMeta2 {
-		deltaId, deltaNode, changed := netMeta.Update(id, node)
+		changed := netMeta.Update(id, node)
 		if changed {
-			delta[deltaId] = deltaNode
+			delta[id] = node
 		}
 	}
 	if len(delta) == 0 {
