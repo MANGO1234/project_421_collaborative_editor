@@ -72,17 +72,32 @@ func (content *versionCheckMsgContent) toJson() []byte {
 }
 
 // constants
-// how often to check version vector and network metadata
-const versionCheckInterval = 30
 
-// how often to reconnect to disconnected nodes
-const reconnectInterval = 30
+// how often to check version vector and network metadata in seconds
+const (
+	// how often to check if version on two nodes match
+	versionCheckInterval = 30
+	// how often to check whether it's time to (re)connect to disconnected nodes
+	reconnectInterval = 30
+)
 
-// message types
-const msgTypeVersionCheck = "versioncheck"
-const msgTypeSync = "sync"
-const msgTypeNetMetaUpdate = "netmeta"
-const msgTypeTreedocOp = "treedocOp"
+// message types of messages sent to existing connection
+const (
+	msgTypeVersionCheck  = "versioncheck"
+	msgTypeSync          = "sync"
+	msgTypeNetMetaUpdate = "netmeta"
+	msgTypeTreedocOp     = "treedocOp"
+)
+
+// the purpose of dialing to a node
+const (
+	// client-initiated call to connect to a remote node
+	dialingTypeRegister = "register"
+	// poke a known node so it has information to connect
+	dialingTypePoke = "poke"
+	// establish persistent connection between the nodes
+	dialingTypeEstablishConnection = "connect"
+)
 
 // states to keep track of
 var myAddr string
@@ -175,6 +190,7 @@ func getLatestMeta() []byte {
 }
 
 func handleNewConn(conn net.Conn) {
+	defer conn.Close()
 	wrapper := newConnWrapper(conn)
 	// distinguish purpose of this connection
 	purpose, err := wrapper.reader.ReadMessage()
@@ -182,7 +198,22 @@ func handleNewConn(conn net.Conn) {
 		return
 	}
 	switch purpose {
-	case "connect":
+	case dialingTypePoke:
+		expectedId, err := wrapper.reader.ReadMessage()
+		if err != nil {
+			return
+		}
+		if expectedId == mySession.id {
+			err = wrapper.writer.WriteMessageSlice("true")
+			if err != nil {
+				return
+			}
+		} else {
+			wrapper.writer.WriteMessageSlice("false")
+			return
+		}
+		fallthrough
+	case dialingTypeRegister:
 		// send latest netmeta to the connecting node
 		latestMeta := getLatestMeta()
 		err = wrapper.writer.WriteMessageSlice(latestMeta)
@@ -202,7 +233,7 @@ func handleNewConn(conn net.Conn) {
 		}
 		// establish persistent connection and perform any necessary broadcast
 		handleIncomingNetMeta(incomingMeta)
-	case "reconnect":
+	case dialingTypeEstablishConnection:
 		// TODO: actually accept persistent
 	default:
 		// invalid purpose
@@ -220,7 +251,11 @@ func ConnectTo(remoteAddr string) (id string, err error) {
 		}
 	}
 	id = mySession.id
-	return id, connectToHelper(remoteAddr)
+	return id, register(remoteAddr)
+}
+
+func register(remoteAddr string) error {
+	return registerOrPokeHelper("", remoteAddr)
 }
 
 // this method doesn't try to establish a persistent connection
@@ -242,17 +277,40 @@ func ConnectTo(remoteAddr string) (id string, err error) {
 // but handling two connections when we only need to handle one is
 // costly and leads to other problems associated with handling more
 // connections
-func connectToHelper(remoteAddr string) error {
+func registerOrPokeHelper(id, remoteAddr string) error {
 	// connect to remote node
 	conn, err := net.Dial("tcp", remoteAddr)
 	if err != nil {
 		return err
 	}
+	defer conn.Close()
 	wrapper := newConnWrapper(conn)
-	// indicate intention to connect
-	err := wrapper.writer.WriteMessage("connect")
+	// indicate intention of this dial
+	var intention string
+	if id == "" {
+		intention = dialingTypeRegister
+	} else {
+		intention = dialingTypePoke
+	}
+	err = wrapper.writer.WriteMessage(intention)
 	if err != nil {
 		return err
+	}
+	// when poking, we need to make sure the other node has the expected id
+	// if it doesn't we should treat the node associated the id as quitted
+	if intention == dialingTypePoke {
+		err = wrapper.writer.WriteMessage(id)
+		if err != nil {
+			return err
+		}
+		match, err := wrapper.reader.ReadMessage()
+		if err != nil {
+			return err
+		}
+		if match == "false" {
+			// TODO: mark node as deleted
+			return nil
+		}
 	}
 	// retrieve latest netmeta from remote node
 	msg, err := wrapper.reader.ReadMessageSlice()
