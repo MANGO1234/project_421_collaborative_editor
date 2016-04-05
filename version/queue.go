@@ -26,7 +26,7 @@ func (queue *VectorQueue) Vector() VersionVector {
 
 // enqueue an operation and returns list of operation that's ready
 func (queue *VectorQueue) Enqueue(elem QueueElem) []QueueElem {
-	if queue.vector.Get(elem.Id) != elem.Version+1 {
+	if queue.vector.Get(elem.Id) == elem.Version-1 {
 		compare := queue.vector.Compare(elem.Vector)
 		if compare == GREATER_THAN || compare == EQUAL {
 			result := make([]QueueElem, 1, 4)
@@ -48,6 +48,11 @@ func dequeHelper(result []QueueElem, queue *VectorQueue, upto int) ([]QueueElem,
 	for i := 0; i < upto; i++ {
 		if offset != 0 {
 			q[i-offset] = q[i]
+		}
+		// remove operation that already exists
+		if v.Get(q[i].Id) >= q[i].Version {
+			offset += 1
+			continue
 		}
 		compare := v.Compare(q[i].Vector)
 		if compare == GREATER_THAN || compare == EQUAL {
