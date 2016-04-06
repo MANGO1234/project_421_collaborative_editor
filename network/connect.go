@@ -42,49 +42,39 @@ const (
 	dialingTypeConnect = "connect"
 )
 
-func register(remoteAddr string) error {
-	return registerOrPokeHelper("", remoteAddr)
-}
-
-// this method doesn't try to establish a persistent connection
-// it's goal is to register into the remote network and communicate
-// the netmeta state between the two networks
-// The actual persisting connection is to be established later
-//
-
-func handleNewConn(conn net.Conn) {
+func (s *session) handleNewConn(conn net.Conn) {
 	defer conn.Close()
 	wrapper := newConnWrapper(conn)
 	// distinguish purpose of this connection
-	purpose, err := wrapper.reader.ReadMessage()
+	purpose, err := wrapper.ReadMessage()
 	if err != nil {
 		return
 	}
 	switch purpose {
 	case dialingTypePoke:
-		expectedId, err := wrapper.reader.ReadMessage()
+		expectedId, err := wrapper.ReadMessage()
 		if err != nil {
 			return
 		}
-		if expectedId == mySession.id {
-			err = wrapper.writer.WriteMessage("true")
+		if expectedId == s.id {
+			err = wrapper.WriteMessage("true")
 			if err != nil {
 				return
 			}
 		} else {
-			wrapper.writer.WriteMessage("false")
+			wrapper.WriteMessage("false")
 			return
 		}
 		fallthrough
 	case dialingTypeClientPoke:
 		// send latest netmeta to the connecting node
 		latestMeta := getLatestMeta()
-		err = wrapper.writer.WriteMessageSlice(latestMeta)
+		err = wrapper.WriteMessageSlice(latestMeta)
 		if err != nil {
 			return
 		}
 		// retrieve the latest netmeta from the connecting node
-		msg, err := wrapper.reader.ReadMessageSlice()
+		msg, err := wrapper.ReadMessageSlice()
 		if err != nil {
 			return
 		}
@@ -99,64 +89,216 @@ func handleNewConn(conn net.Conn) {
 	case dialingTypeConnect:
 		// TODO: actually accept persistent
 	case dialingTypeClientConnect:
+		// TODO:
 	default:
 		// invalid purpose
 		return
 	}
 }
 
-func registerOrPokeHelper(id, remoteAddr string) error {
+func foreverRead(wrapper *ConnWrapper) {
+	for {
+		rawMsg, err := wrapper.ReadMessageSlice()
+		var msg Message
+		if err != nil {
+			handleDisconnect()
+		}
+		err = json.Unmarshal(rawMsg, &msg)
+		if err != nil {
+			handleBadNode()
+		}
+		myBroadcastChan <- msg
+	}
+}
+
+func handleBadNode() {
+	// We can just ignore it; no harm done
+	// TODO: if we have time, should force the node to quit
+}
+
+func handleDisconnect() {
+	// TODO
+}
+
+// func poke(id, remoteAddr string) error {
+
+// }
+
+// client uses this to register itself to a remote network
+func register(localAddr, remoteAddr string) error {
+	if shouldPoke(localAddr, remoteAddr) {
+		return clientPoke(remoteAddr)
+	} else {
+		return clientConnect(remoteAddr)
+	}
+}
+
+func clientPoke(remoteAddr string) error {
+	wrapper, err := dial(dialingTypeClientPoke, remoteAddr)
+	if err != nil {
+		return err
+	}
+	defer wrapper.Close()
+	incomingMeta, err := retrieveNetMeta(wrapper)
+	if err != nil {
+		return err
+	}
+	// at this point, we consider the client poke as successful
+	// since we have enough info to be considered as part of the network
+	latestMeta := getLatestMeta()
+	wrapper.WriteMessageSlice(latestMeta)
+	handleIncomingNetMeta(incomingMeta)
+	return nil
+}
+
+func poke(expectedId, remoteAddr string) error {
+	wrapper, err := dial(dialingTypePoke, remoteAddr)
+	if err != nil {
+		return err
+	}
+	defer wrapper.Close()
+	matches, err := checkId(wrapper, expectedId)
+	if err != nil {
+		return err
+	}
+	if matches {
+		incomingMeta, err := retrieveNetMeta(wrapper)
+		if err != nil {
+			return err
+		}
+		latestMeta := getLatestMeta()
+		err = wrapper.WriteMessageSlice(latestMeta)
+		if err != nil {
+			return err
+		}
+		handleIncomingNetMeta(incomingMeta)
+		return nil
+	} else {
+		// TODO mark node as deleted
+		return nil
+	}
+}
+
+func clientConnect(remoteAddr string) error {
+	wrapper, err := dial(dialingTypeClientConnect, remoteAddr)
+	if err != nil {
+		return err
+	}
+	// wrap the code in a version check msg
+	// incomingMeta, err := retrieveNetMeta(wrapper)
+	// if err != nil {
+	// 	return err
+	// }
+	remoteId, err := wrapper.ReadMessage()
+	// wrap the code in a version check msg
+	// latestMeta := getLatestMeta()
+	// err = wrapper.WriteMessageSlice(latestMeta)
+	if err != nil {
+		return err
+	}
+	// TODO: add remote node into metadata
+	ignore(remoteId)
+	// TODO: add remote node into the connected map
+	go foreverRead(wrapper)
+	//handleIncomingNetMeta(incomingMeta)
+	return nil
+}
+
+func ignore(v interface{}) {
+
+}
+
+func connect(remoteAddr string) error {
+	wrapper, err := dial(dialingTypeClientConnect, remoteAddr)
+	if err != nil {
+		return err
+	}
+	incomingMeta, err := retrieveNetMeta(wrapper)
+	if err != nil {
+		return err
+	}
+	remoteId, err := wrapper.ReadMessage()
+	ignore(remoteId)
+	latestMeta := getLatestMeta()
+	err = wrapper.WriteMessageSlice(latestMeta)
+	if err != nil {
+		return err
+	}
+	// TODO: add remote node into metadata
+	// TODO: add remote node into the connected map
+	handleIncomingNetMeta(incomingMeta)
+	return nil
+}
+
+func shouldPoke(localAddr, remoteAddr string) bool {
+	return localAddr > remoteAddr
+}
+
+func dial(dialType, remoteAddr string) (*ConnWrapper, error) {
 	// connect to remote node
 	conn, err := net.Dial("tcp", remoteAddr)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	defer conn.Close()
 	wrapper := newConnWrapper(conn)
 	// indicate intention of this dial
-	var intention string
-	if id == "" {
-		intention = dialingTypeClientPoke
+	err = wrapper.WriteMessage(dialType)
+	if err != nil {
+		conn.Close()
+		return nil, err
+	}
+	return wrapper, nil
+}
+
+func checkId(wrapper *ConnWrapper, expectedId string) (success bool, err error) {
+	err = wrapper.WriteMessage(expectedId)
+	if err != nil {
+		return
+	}
+	match, err := wrapper.ReadMessage()
+	if err != nil {
+		return
+	}
+	return match == "true", nil
+}
+
+func handleIdCheck(localId string, wrapper *ConnWrapper) (success bool, err error) {
+	expectedId, err := wrapper.ReadMessage()
+	if err != nil {
+		return
+	}
+	if localId == expectedId {
+		err = wrapper.WriteMessage("true")
+		if err != nil {
+			return
+		}
+		success = true
 	} else {
-		intention = dialingTypePoke
+		wrapper.WriteMessage("false")
+		success = false
 	}
-	err = wrapper.writer.WriteMessage(intention)
+	return
+}
+
+func retrieveNetMeta(wrapper *ConnWrapper) (NetMeta, error) {
+	msg, err := wrapper.ReadMessageSlice()
 	if err != nil {
-		return err
-	}
-	// when poking, we need to make sure the other node has the expected id
-	// if it doesn't we should treat the node associated the id as quitted
-	if intention == dialingTypePoke {
-		err = wrapper.writer.WriteMessage(id)
-		if err != nil {
-			return err
-		}
-		match, err := wrapper.reader.ReadMessage()
-		if err != nil {
-			return err
-		}
-		if match == "false" {
-			// TODO: mark node as deleted
-			return nil
-		}
-	}
-	// retrieve latest netmeta from remote node
-	msg, err := wrapper.reader.ReadMessageSlice()
-	if err != nil {
-		return err
+		return nil, err
 	}
 	var incomingMeta NetMeta
 	err = json.Unmarshal(msg, &incomingMeta)
 	if err != nil {
-		return err
+		return incomingMeta, err
 	}
-	// send latest netmeta to the remote node
-	latestMeta := getLatestMeta()
-	wrapper.writer.WriteMessageSlice(latestMeta)
-	// The write is this node's best attempt, with the netmeta received, this node
-	// considers itself to be part of the network; Thus no error handling
-	conn.Close()
-	// establish persistent connection and perform any necessary broadcast
-	handleIncomingNetMeta(incomingMeta)
-	return nil
+	return incomingMeta, err
+}
+
+func handleIncomingNetMeta(meta NetMeta) {
+
+}
+
+// TODO: not too sure how to organize yet
+//       might want to have locks here or maybe in netmeta
+func getLatestMeta() []byte {
+	return myNetMeta.ToJson()
 }

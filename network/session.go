@@ -64,15 +64,9 @@ func (s *session) listenForNewConn() {
 		}
 		conn, err := s.listener.Accept()
 		if err == nil {
-			go handleNewConn(conn)
+			go s.handleNewConn(conn)
 		}
 	}
-}
-
-// TODO: not too sure how to organize yet
-//       might want to have locks here or maybe in netmeta
-func getLatestMeta() []byte {
-	return myNetMeta.ToJson()
 }
 
 func (node *Node) reconnect() {

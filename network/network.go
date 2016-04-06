@@ -23,6 +23,12 @@ type Node struct {
 	conn *ConnWrapper
 }
 
+type ConnWrapper struct {
+	conn   net.Conn
+	reader *util.MessageReader
+	writer *util.MessageWriter
+}
+
 // get a new ConnWrapper around a connection
 func newConnWrapper(conn net.Conn) *ConnWrapper {
 	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
@@ -31,16 +37,30 @@ func newConnWrapper(conn net.Conn) *ConnWrapper {
 	return &wrapper
 }
 
+func (w *ConnWrapper) Close() error {
+	return w.conn.Close()
+}
+
+func (w *ConnWrapper) WriteMessageSlice(msg []byte) error {
+	return w.writer.WriteMessageSlice(msg)
+}
+
+func (w *ConnWrapper) WriteMessage(msg string) error {
+	return w.writer.WriteMessage(msg)
+}
+
+func (w *ConnWrapper) ReadMessage() (string, error) {
+	return w.ReadMessage()
+}
+
+func (w *ConnWrapper) ReadMessageSlice() ([]byte, error) {
+	return w.ReadMessageSlice()
+}
+
 type Message struct {
 	Type    string
 	Visited map[string]struct{}
 	Msg     []byte
-}
-
-type ConnWrapper struct {
-	conn   net.Conn
-	reader *util.MessageReader
-	writer *util.MessageWriter
 }
 
 // type ConnectMessage struct {
@@ -87,8 +107,8 @@ var myMsgChan chan Message
 var myBroadcastChan chan Message
 var myNetMeta NetMeta
 var myNetMetaRWMutex sync.RWMutex
-var myConnectedNodes map[string]Node
-var myDisconnectedNodes map[string]Node
+var myConnectedNodes map[string]*Node
+var myDisconnectedNodes map[string]*Node
 var myConnectionMutex sync.Mutex
 var mySession *session
 
@@ -107,10 +127,6 @@ func serveIncomingMessages(in <-chan Message) {
 			// ignore and do nothing
 		}
 	}
-}
-
-func handleIncomingNetMeta(meta NetMeta) {
-
 }
 
 func serveBroadcastRequests(in <-chan Message) {

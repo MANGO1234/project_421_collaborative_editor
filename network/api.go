@@ -11,8 +11,8 @@ func Initialize(addr string) (string, error) {
 	myBroadcastChan = make(chan Message, 15)
 	myMsgChan = make(chan Message)
 	myNetMeta = NewNetMeta()
-	myConnectedNodes = make(map[string]Node)
-	myDisconnectedNodes = make(map[string]Node)
+	myConnectedNodes = make(map[string]*Node)
+	myDisconnectedNodes = make(map[string]*Node)
 	go serveBroadcastRequests(myBroadcastChan)
 	go serveIncomingMessages(myMsgChan)
 	var err error
@@ -31,7 +31,7 @@ func ConnectTo(remoteAddr string) (id string, err error) {
 		}
 	}
 	id = mySession.id
-	return id, register(remoteAddr)
+	return id, register(myAddr, remoteAddr)
 }
 
 // Disconnect disconnects the current node from the network voluntarily
