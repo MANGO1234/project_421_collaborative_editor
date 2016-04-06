@@ -4,6 +4,16 @@ import (
 	"bytes"
 )
 
+const NO_OPERATION = 0
+const INSERT = 1
+const DELETE = 2
+
+type BufferOperation struct {
+	Type byte
+	Pos  int
+	Atom byte
+}
+
 type Line struct {
 	Prev  *Line
 	Next  *Line
@@ -54,7 +64,7 @@ func SeqToLines(seq WordSequence, width int) (*Line, int, int) {
 			continue
 		}
 
-		wordLen := sliceLength(word)
+		wordLen := wordLength(word)
 		if i+wordLen <= width {
 			line.Bytes = append(line.Bytes, word...)
 			i += wordLen
@@ -219,6 +229,14 @@ func (buf *Buffer) Delete(pos int) {
 		buf.currentPosition--
 	}
 	buf.Resize(buf.width)
+}
+
+func (buf *Buffer) ApplyOperation(bufOp BufferOperation) {
+	if bufOp.Type == INSERT {
+		buf.Insert(bufOp.Pos, bufOp.Atom)
+	} else if bufOp.Type == DELETE {
+		buf.Delete(bufOp.Pos)
+	}
 }
 
 func (buf *Buffer) SetPosition(pos int) {

@@ -10,14 +10,13 @@ import (
 
 type DocumentModel struct {
 	sync.RWMutex
-	OwnerId       SiteId
-	OpVersion     uint32
-	NodeIdClock   uint32
-	CurrentNodeId treedoc2.NodeId
-	Treedoc       *treedoc2.Document
-	Buffer        *buffer.Buffer
-	Log           *OperationLog
-	Queue         *version.VectorQueue
+	OwnerId     SiteId
+	OpVersion   uint32
+	NodeIdClock uint32
+	Treedoc     *treedoc2.Document
+	Buffer      *buffer.Buffer
+	Log         *OperationLog
+	Queue       *version.VectorQueue
 }
 
 func NewDocumentModel(id SiteId, width int) *DocumentModel {
@@ -78,12 +77,8 @@ func (model *DocumentModel) RemoteOperation(vector version.VersionVector, id Sit
 		Operation: operation,
 	})
 	for _, elem := range queueElems {
-		bufOp := treedoc2.ApplyOperation(model.Treedoc, elem.Operation)
-		if bufOp.Type == treedoc2.INSERT {
-			model.Buffer.Insert(bufOp.Pos, bufOp.Atom)
-		} else if bufOp.Type == treedoc2.DELETE {
-			model.Buffer.Delete(bufOp.Pos)
-		}
+		bufOp := model.Treedoc.ApplyOperation(elem.Operation)
+		model.Buffer.ApplyOperation(bufOp)
 		model.Log.Write(elem.Id, elem.Version, elem.Operation)
 		model.AssertEqual()
 	}

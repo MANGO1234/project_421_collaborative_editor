@@ -1,6 +1,7 @@
 package treedoc2
 
 import (
+	"../buffer"
 	"bytes"
 	"fmt"
 	"math"
@@ -45,12 +46,6 @@ type Operation struct {
 	Id       NodeId
 	N        uint16
 	Atom     byte
-}
-
-type BufferOperation struct {
-	Type byte
-	Pos  int
-	Atom byte
 }
 
 func NewDocument() *Document {
@@ -100,17 +95,17 @@ func insertAtom(atoms []Atom, atom Atom, i uint16) []Atom {
 	return atoms
 }
 
-func ApplyOperation(doc *Document, operation Operation) BufferOperation {
+func (doc *Document) ApplyOperation(operation Operation) buffer.BufferOperation {
 	if operation.Type == INSERT_NEW {
-		return InsertNew(doc, operation)
+		return doc.InsertNew(operation)
 	} else if operation.Type == INSERT {
-		return Insert(doc, operation)
+		return doc.Insert(operation)
 	} else if operation.Type == DELETE {
-		return Delete(doc, operation)
+		return doc.Delete(operation)
 	} else if operation.Type == INSERT_ROOT {
-		return InsertRoot(doc, operation)
+		return doc.InsertRoot(operation)
 	}
-	return BufferOperation{Type: NO_OPERATION}
+	return buffer.BufferOperation{Type: buffer.NO_OPERATION}
 }
 
 func updateSize(doc *Document, node *DocNode, delta int) {
@@ -155,7 +150,7 @@ func calcPos(doc *Document, node *DocNode, n int) int {
 // ******************** Operations On Treedoc (Remote operations) ************************
 // ***************************************************************************************
 
-func InsertNew(doc *Document, operation Operation) BufferOperation {
+func (doc *Document) InsertNew(operation Operation) buffer.BufferOperation {
 	parent := doc.Nodes[operation.ParentId]
 	newNode := &DocNode{
 		NodeId:  operation.Id,
@@ -179,10 +174,10 @@ func InsertNew(doc *Document, operation Operation) BufferOperation {
 	}
 	updateSize(doc, newNode, 1)
 	pos := calcPos(doc, newNode, int(operation.N))
-	return BufferOperation{Type: INSERT, Pos: pos, Atom: operation.Atom}
+	return buffer.BufferOperation{Type: buffer.INSERT, Pos: pos, Atom: operation.Atom}
 }
 
-func InsertRoot(doc *Document, operation Operation) BufferOperation {
+func (doc *Document) InsertRoot(operation Operation) buffer.BufferOperation {
 	newNode := &DocNode{
 		Parent: nil,
 		NodeId: operation.Id,
@@ -193,10 +188,10 @@ func InsertRoot(doc *Document, operation Operation) BufferOperation {
 	doc.Doc = insertNode(doc.Doc, newNode)
 	updateSize(doc, newNode, 1)
 	pos := calcPos(doc, newNode, int(operation.N))
-	return BufferOperation{Type: INSERT, Pos: pos, Atom: operation.Atom}
+	return buffer.BufferOperation{Type: buffer.INSERT, Pos: pos, Atom: operation.Atom}
 }
 
-func Delete(doc *Document, operation Operation) BufferOperation {
+func (doc *Document) Delete(operation Operation) buffer.BufferOperation {
 	node := doc.Nodes[operation.Id]
 	node.Atoms = extendAtoms(node.Atoms, operation.N)
 	atom := node.Atoms[operation.N]
@@ -206,10 +201,10 @@ func Delete(doc *Document, operation Operation) BufferOperation {
 	pos := calcPos(doc, node, int(operation.N))
 	node.Atoms[operation.N] = Atom{State: DEAD, Atom: atom.Atom, Left: atom.Left, Size: atom.Size - 1}
 	updateSize(doc, node, -1)
-	return BufferOperation{Type: DELETE, Pos: pos}
+	return buffer.BufferOperation{Type: buffer.DELETE, Pos: pos}
 }
 
-func Insert(doc *Document, operation Operation) BufferOperation {
+func (doc *Document) Insert(operation Operation) buffer.BufferOperation {
 	node := doc.Nodes[operation.Id]
 	node.Atoms = extendAtoms(node.Atoms, operation.N)
 	atom := node.Atoms[operation.N]
@@ -219,7 +214,7 @@ func Insert(doc *Document, operation Operation) BufferOperation {
 	node.Atoms[operation.N] = Atom{State: ALIVE, Atom: operation.Atom, Left: atom.Left, Size: atom.Size + 1}
 	updateSize(doc, node, 1)
 	pos := calcPos(doc, node, int(operation.N))
-	return BufferOperation{Type: INSERT, Pos: pos, Atom: operation.Atom}
+	return buffer.BufferOperation{Type: buffer.INSERT, Pos: pos, Atom: operation.Atom}
 }
 
 // ***************************************************************************************
@@ -300,7 +295,7 @@ func insertPosNewHelper(doc *Document, node *DocNode, n int, nodeId NodeId, ch b
 	for {
 		if len(node.Atoms[n].Left) == 0 {
 			op := Operation{Type: INSERT_NEW, Id: nodeId, N: 0, ParentId: node.NodeId, ParentN: uint16(n), Atom: ch}
-			InsertNew(doc, op)
+			doc.InsertNew(op)
 			return op
 		}
 		node = node.Atoms[n].Left[len(node.Atoms[n].Left)-1]
@@ -315,7 +310,7 @@ func insertPosNewHelper(doc *Document, node *DocNode, n int, nodeId NodeId, ch b
 func InsertPos(doc *Document, nodeId NodeId, pos int, ch byte) Operation {
 	if doc.Size == 0 {
 		op := Operation{Type: INSERT_ROOT, Id: nodeId, N: 0, Atom: ch}
-		InsertRoot(doc, op)
+		doc.InsertRoot(op)
 		return op
 	}
 
@@ -352,7 +347,7 @@ func InsertPos(doc *Document, nodeId NodeId, pos int, ch byte) Operation {
 func DeletePos(doc *Document, pos int) Operation {
 	node, n := posToIdForDel(doc.Doc, pos)
 	op := Operation{Type: DELETE, Id: node.NodeId, N: uint16(n)}
-	Delete(doc, op)
+	doc.Delete(op)
 	return op
 }
 
