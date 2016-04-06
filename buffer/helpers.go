@@ -1,4 +1,4 @@
-package gui
+package buffer
 
 type WordSequence interface {
 	NextWord() []byte
@@ -14,16 +14,16 @@ func NewLineSequence(lines *Line) *LineSequence {
 }
 
 func (seq *LineSequence) NextWord() []byte {
-	for seq.lines != nil && seq.currentX == len(seq.lines.bytes) {
-		seq.lines = seq.lines.next
+	for seq.lines != nil && seq.currentX == len(seq.lines.Bytes) {
+		seq.lines = seq.lines.Next
 		seq.currentX = 0
 	}
 
-	if seq.lines.next == nil {
+	if seq.lines.Next == nil {
 		return nil
 	}
 
-	ch := seq.lines.bytes[seq.currentX]
+	ch := seq.lines.Bytes[seq.currentX]
 	if ch == ' ' {
 		seq.currentX++
 		return []byte(" ")
@@ -40,8 +40,8 @@ func (seq *LineSequence) NextWord() []byte {
 	start := seq.currentX
 	end := seq.currentX + 1
 	multiline := true
-	for end < len(seq.lines.bytes) {
-		ch := seq.lines.bytes[end]
+	for end < len(seq.lines.Bytes) {
+		ch := seq.lines.Bytes[end]
 		if ch == ' ' || ch == '\t' || ch == '\n' {
 			multiline = false
 			break
@@ -51,29 +51,29 @@ func (seq *LineSequence) NextWord() []byte {
 
 	if !multiline {
 		seq.currentX = end
-		return seq.lines.bytes[start:end]
+		return seq.lines.Bytes[start:end]
 	} else {
 		chs := make([]byte, 0)
-		chs = append(chs, seq.lines.bytes[start:end]...)
+		chs = append(chs, seq.lines.Bytes[start:end]...)
 		for {
-			if seq.lines.next == nil {
+			if seq.lines.Next == nil {
 				break
 			}
-			ch := seq.lines.next.bytes[0]
+			ch := seq.lines.Next.Bytes[0]
 			if ch == ' ' || ch == '\t' || ch == '\n' {
 				break
 			}
-			seq.lines = seq.lines.next
+			seq.lines = seq.lines.Next
 			end = 1
-			for end < len(seq.lines.bytes) {
-				ch := seq.lines.bytes[end]
+			for end < len(seq.lines.Bytes) {
+				ch := seq.lines.Bytes[end]
 				if ch == ' ' || ch == '\t' || ch == '\n' {
 					break
 				}
 				end++
 			}
-			chs = append(chs, seq.lines.bytes[:end]...)
-			if end != len(seq.lines.bytes) {
+			chs = append(chs, seq.lines.Bytes[:end]...)
+			if end != len(seq.lines.Bytes) {
 				break
 			}
 		}

@@ -1,4 +1,4 @@
-package gui
+package buffer
 
 import (
 	"reflect"
@@ -35,8 +35,8 @@ func TestStringToBuffer(t *testing.T) {
 	assertEqual(t, "abc abcabcabc", buf.ToString())
 	assertEqual(t, len("abc abcabcabc"), buf.numberOfChars)
 	assertEqual(t, 2, buf.numberOfLines)
-	assertEqual(t, "abc ", string(buf.lines.bytes))
-	assertEqual(t, "abcabcabc\n", string(buf.lines.next.bytes))
+	assertEqual(t, "abc ", string(buf.lines.Bytes))
+	assertEqual(t, "abcabcabc\n", string(buf.lines.Next.Bytes))
 
 	buf = StringToBuffer("abcabcabcabcabcabcabcabcabcabcabcdef", 10)
 	assertEqual(t, "abcabcabcabcabcabcabcabcabcabcabcdef", buf.ToString())

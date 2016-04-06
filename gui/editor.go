@@ -1,16 +1,18 @@
 package gui
 
 import (
+	"../buffer"
+	"../treedocmanager"
 	"bytes"
 	"github.com/nsf/termbox-go"
 	"strconv"
 )
 
-func DrawLines(lines *Line, height int) {
+func DrawLines(lines *buffer.Line, height int) {
 	y := 0
 	for lines != nil && y < height {
 		x := 0
-		for _, ch := range lines.bytes {
+		for _, ch := range lines.Bytes {
 			if ch == '\t' {
 				for i := 0; i < 4; i++ {
 					termbox.SetCell(x+i, y, ' ', termbox.ColorWhite, termbox.ColorDefault)
@@ -22,7 +24,7 @@ func DrawLines(lines *Line, height int) {
 			}
 		}
 		y++
-		lines = lines.next
+		lines = lines.Next
 	}
 }
 
@@ -61,13 +63,14 @@ func InitEditor() error {
 		build.WriteString(strconv.Itoa(i))
 		build.WriteString("\n")
 	}
-	buf := StringToBuffer(build.String(), width)
-	DrawLines(buf.Lines(), height)
+	doc := treedocmanager.NewDocumentModel("aaaaaaaaaaaaaaaa", width)
+	//	buf := StringToBuffer(build.String(), width)
+	DrawLines(doc.Buffer.Lines(), height)
 	termbox.SetCursor(0, 0)
 	termbox.Flush()
 
 	var cursorX, cursorY int
-	var lines *Line
+	var lines *buffer.Line
 	screenY := 0
 	for {
 		switch ev := termbox.PollEvent(); ev.Type {
@@ -76,72 +79,72 @@ func InitEditor() error {
 			case termbox.KeyCtrlC:
 				return nil
 			case termbox.KeyArrowLeft:
-				buf.MoveLeft()
-				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				doc.Buffer.MoveLeft()
+				screenY, cursorX, cursorY, lines = doc.Buffer.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 				DrawLines(lines, height)
 				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
 			case termbox.KeyArrowRight:
-				buf.MoveRight()
-				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				doc.Buffer.MoveRight()
+				screenY, cursorX, cursorY, lines = doc.Buffer.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 				DrawLines(lines, height)
 				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
 			case termbox.KeyArrowUp:
-				buf.MoveUp()
-				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				doc.Buffer.MoveUp()
+				screenY, cursorX, cursorY, lines = doc.Buffer.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 				DrawLines(lines, height)
 				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
 			case termbox.KeyArrowDown:
-				buf.MoveDown()
-				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				doc.Buffer.MoveDown()
+				screenY, cursorX, cursorY, lines = doc.Buffer.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 				DrawLines(lines, height)
 				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
 			case termbox.KeyBackspace:
-				buf.BackspaceAtCurrent()
-				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				doc.LocalBackspace()
+				screenY, cursorX, cursorY, lines = doc.Buffer.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 				DrawLines(lines, height)
 				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
 			case termbox.KeyDelete:
-				buf.DeleteAtCurrent()
-				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				doc.LocalDelete()
+				screenY, cursorX, cursorY, lines = doc.Buffer.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 				DrawLines(lines, height)
 				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
 			case termbox.KeySpace:
-				buf.InsertAtCurrent(' ')
-				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				doc.LocalInsert(' ')
+				screenY, cursorX, cursorY, lines = doc.Buffer.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 				DrawLines(lines, height)
 				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
 			case termbox.KeyTab:
-				buf.InsertAtCurrent('\t')
-				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				doc.LocalInsert('\t')
+				screenY, cursorX, cursorY, lines = doc.Buffer.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 				DrawLines(lines, height)
 				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
 			case termbox.KeyEnter:
-				buf.InsertAtCurrent('\n')
-				screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+				doc.LocalInsert('\n')
+				screenY, cursorX, cursorY, lines = doc.Buffer.GetDisplayInformation(screenY, height)
 				termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 				DrawLines(lines, height)
 				termbox.SetCursor(cursorX, cursorY)
 				termbox.Flush()
 			default:
 				if ev.Key == 0 && ev.Ch <= 256 {
-					buf.InsertAtCurrent(byte(ev.Ch))
-					screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+					doc.LocalInsert(byte(ev.Ch))
+					screenY, cursorX, cursorY, lines = doc.Buffer.GetDisplayInformation(screenY, height)
 					termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 					DrawLines(lines, height)
 					termbox.SetCursor(cursorX, cursorY)
@@ -151,11 +154,11 @@ func InitEditor() error {
 		case termbox.EventResize:
 			width = ev.Width
 			height = ev.Height
-			buf.Resize(width)
+			doc.Buffer.Resize(width)
 			// this is a bug within the library, without this call clear would panic when
 			// cursor is outside of resized window
 			termbox.HideCursor()
-			screenY, cursorX, cursorY, lines = buf.GetDisplayInformation(screenY, height)
+			screenY, cursorX, cursorY, lines = doc.Buffer.GetDisplayInformation(screenY, height)
 			termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 			DrawLines(lines, height)
 			termbox.SetCursor(cursorX, cursorY)

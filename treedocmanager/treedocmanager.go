@@ -5,7 +5,6 @@ package treedocmanager
 
 import (
 	"../treedoc2"
-
 	"fmt"
 )
 
