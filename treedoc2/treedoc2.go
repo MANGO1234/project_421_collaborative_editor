@@ -191,19 +191,6 @@ func (doc *Document) InsertRoot(operation Operation) buffer.BufferOperation {
 	return buffer.BufferOperation{Type: buffer.REMOTE_INSERT, Pos: pos, Atom: operation.Atom}
 }
 
-func (doc *Document) Delete(operation Operation) buffer.BufferOperation {
-	node := doc.Nodes[operation.Id]
-	node.Atoms = extendAtoms(node.Atoms, operation.N)
-	atom := node.Atoms[operation.N]
-	if atom.State != ALIVE {
-		panic("Atom is not alive \"" + DocToString(doc) + "\" ")
-	}
-	pos := calcPos(doc, node, int(operation.N))
-	node.Atoms[operation.N] = Atom{State: DEAD, Atom: atom.Atom, Left: atom.Left, Size: atom.Size - 1}
-	updateSize(doc, node, -1)
-	return buffer.BufferOperation{Type: buffer.DELETE, Pos: pos}
-}
-
 func (doc *Document) Insert(operation Operation) buffer.BufferOperation {
 	node := doc.Nodes[operation.Id]
 	node.Atoms = extendAtoms(node.Atoms, operation.N)
@@ -215,6 +202,22 @@ func (doc *Document) Insert(operation Operation) buffer.BufferOperation {
 	updateSize(doc, node, 1)
 	pos := calcPos(doc, node, int(operation.N))
 	return buffer.BufferOperation{Type: buffer.REMOTE_INSERT, Pos: pos, Atom: operation.Atom}
+}
+
+func (doc *Document) Delete(operation Operation) buffer.BufferOperation {
+	node := doc.Nodes[operation.Id]
+	node.Atoms = extendAtoms(node.Atoms, operation.N)
+	atom := node.Atoms[operation.N]
+	if atom.State == UNINITIALIZED {
+		panic("Atom is not alive \"" + DocToString(doc) + "\" ")
+	}
+	if atom.State == ALIVE {
+		pos := calcPos(doc, node, int(operation.N))
+		node.Atoms[operation.N] = Atom{State: DEAD, Atom: atom.Atom, Left: atom.Left, Size: atom.Size - 1}
+		updateSize(doc, node, -1)
+		return buffer.BufferOperation{Type: buffer.DELETE, Pos: pos}
+	}
+	return buffer.BufferOperation{Type: buffer.NO_OPERATION}
 }
 
 // ***************************************************************************************

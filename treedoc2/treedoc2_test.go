@@ -135,20 +135,20 @@ func TestInsertInsert(t *testing.T) {
 	assertEqual(t, 6, d1.Size)
 }
 
-//func TestDeleteDelete(t *testing.T) {
-//	d := NewTestDoc()
-//	d.ApplyOperation(Operation{Type: DELETE, Id: C_ID1, N: 1})
-//	assertEqual(t, "cfadehb", DocToString(d))
-//	x, y := DocStat(d)
-//	assertEqual(t, 7, x)
-//	assertEqual(t, 1, y)
-//
-//	d.ApplyOperation(Operation{Type: DELETE, Id: C_ID1, N: 1})
-//	assertEqual(t, "cfadehb", DocToString(d))
-//	x, y = DocStat(d)
-//	assertEqual(t, 7, x)
-//	assertEqual(t, 1, y)
-//}
+func TestDeleteDelete(t *testing.T) {
+	d := NewTestDoc()
+	d.ApplyOperation(Operation{Type: DELETE, Id: C_ID1, N: 1})
+	assertEqual(t, "cfadehb", DocToString(d))
+	x, y := DocStat(d)
+	assertEqual(t, 7, x)
+	assertEqual(t, 1, y)
+
+	d.ApplyOperation(Operation{Type: DELETE, Id: C_ID1, N: 1})
+	assertEqual(t, "cfadehb", DocToString(d))
+	x, y = DocStat(d)
+	assertEqual(t, 7, x)
+	assertEqual(t, 1, y)
+}
 
 func TestDeletePos(t *testing.T) {
 	for i := 0; i < 8; i++ {
