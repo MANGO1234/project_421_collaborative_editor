@@ -18,7 +18,8 @@ import (
 	"time"
 )
 
-type Node struct {
+type node struct {
+	id   string
 	addr string
 	conn *ConnWrapper
 }
@@ -101,14 +102,17 @@ const (
 	msgTypeTreedocOp     = "treedocOp"
 )
 
+// TODO: we might want to abstract this out into
+// a struct and invoke functions on the struct
+// but need to put more thought on how to divide things up
 // states to keep track of
 var myAddr string
 var myMsgChan chan Message
 var myBroadcastChan chan Message
 var myNetMeta NetMeta
 var myNetMetaRWMutex sync.RWMutex
-var myConnectedNodes map[string]*Node
-var myDisconnectedNodes map[string]*Node
+var myConnectedNodes map[string]*node
+var myDisconnectedNodes map[string]*node
 var myConnectionMutex sync.Mutex
 var mySession *session
 
@@ -141,6 +145,10 @@ func NewSyncMessage(msgType string, content []byte) Message {
 		nil,
 		content,
 	}
+}
+
+func NewTreedocOpBroadcastMsg(content []byte) Message {
+	return NewBroadcastMessage(msgTypeTreedocOp, content)
 }
 
 func NewBroadcastMessage(msgType string, content []byte) Message {

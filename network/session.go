@@ -69,10 +69,6 @@ func (s *session) listenForNewConn() {
 	}
 }
 
-func (node *Node) reconnect() {
-	// TODO reconnect
-}
-
 func (s *session) periodicallyReconnectDisconnectedNodes() {
 	s.Add(1)
 	defer s.Done()

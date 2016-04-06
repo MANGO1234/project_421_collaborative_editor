@@ -42,27 +42,25 @@ const (
 	dialingTypeConnect = "connect"
 )
 
+func handleNetworkError(err error, conn net.Conn) {
+	if err != nil {
+		conn.Close()
+	}
+}
+
 func (s *session) handleNewConn(conn net.Conn) {
-	defer conn.Close()
 	wrapper := newConnWrapper(conn)
 	// distinguish purpose of this connection
 	purpose, err := wrapper.ReadMessage()
 	if err != nil {
+		conn.Close()
 		return
 	}
 	switch purpose {
 	case dialingTypePoke:
-		expectedId, err := wrapper.ReadMessage()
-		if err != nil {
-			return
-		}
-		if expectedId == s.id {
-			err = wrapper.WriteMessage("true")
-			if err != nil {
-				return
-			}
-		} else {
-			wrapper.WriteMessage("false")
+		idMatches, err := handleIdCheck(s.id, wrapper)
+		if err != nil || !idMatches {
+			conn.Close()
 			return
 		}
 		fallthrough
@@ -73,27 +71,58 @@ func (s *session) handleNewConn(conn net.Conn) {
 		if err != nil {
 			return
 		}
-		// retrieve the latest netmeta from the connecting node
-		msg, err := wrapper.ReadMessageSlice()
+		incomingMeta, err := retrieveNetMeta(wrapper)
 		if err != nil {
 			return
 		}
 		conn.Close()
-		var incomingMeta NetMeta
-		err = json.Unmarshal(msg, &incomingMeta)
+		handleIncomingNetMeta(incomingMeta)
+	case dialingTypeConnect:
+		idMatches, err := handleIdCheck(s.id, wrapper)
+		if err != nil || !idMatches {
+			conn.Close()
+			return
+		}
+		n, err := retrieveNode(wrapper)
 		if err != nil {
 			return
 		}
-		// establish persistent connection and perform any necessary broadcast
-		handleIncomingNetMeta(incomingMeta)
-	case dialingTypeConnect:
-		// TODO: actually accept persistent
+		establishConnection(n, wrapper)
 	case dialingTypeClientConnect:
-		// TODO:
+		err = wrapper.WriteMessage(s.id)
+		if err != nil {
+			conn.Close()
+			return
+		}
+		n, err := retrieveNode(wrapper)
+		if err != nil {
+			return
+		}
+		establishConnection(n, wrapper)
 	default:
 		// invalid purpose
-		return
+		conn.Close()
 	}
+}
+
+func retrieveNode(wrapper *ConnWrapper) (*node, error) {
+	id, err := wrapper.ReadMessage()
+	if err != nil {
+		wrapper.Close()
+		return nil, err
+	}
+	addr, err := wrapper.ReadMessage()
+	if err != nil {
+		wrapper.Close()
+		return nil, err
+	}
+	return addOrRetrieveNode(id, addr), nil
+}
+
+func addOrRetrieveNode(id, addr string) *node {
+	// TODO
+	// TODO check if it's already existing
+	return &node{}
 }
 
 func foreverRead(wrapper *ConnWrapper) {
@@ -133,6 +162,14 @@ func register(localAddr, remoteAddr string) error {
 	}
 }
 
+func (n *node) tryPokeOrConnect(localAddr string) error {
+	if shouldPoke(localAddr, n.addr) {
+		return n.poke()
+	} else {
+		return n.connect()
+	}
+}
+
 func clientPoke(remoteAddr string) error {
 	wrapper, err := dial(dialingTypeClientPoke, remoteAddr)
 	if err != nil {
@@ -151,13 +188,13 @@ func clientPoke(remoteAddr string) error {
 	return nil
 }
 
-func poke(expectedId, remoteAddr string) error {
-	wrapper, err := dial(dialingTypePoke, remoteAddr)
+func (n *node) poke() error {
+	wrapper, err := dial(dialingTypePoke, n.addr)
 	if err != nil {
 		return err
 	}
 	defer wrapper.Close()
-	matches, err := checkId(wrapper, expectedId)
+	matches, err := checkId(wrapper, n.id)
 	if err != nil {
 		return err
 	}
@@ -169,14 +206,19 @@ func poke(expectedId, remoteAddr string) error {
 		latestMeta := getLatestMeta()
 		err = wrapper.WriteMessageSlice(latestMeta)
 		if err != nil {
+			handleIncomingNetMeta(incomingMeta)
 			return err
 		}
 		handleIncomingNetMeta(incomingMeta)
 		return nil
 	} else {
-		// TODO mark node as deleted
+		n.handleNodeQuit()
 		return nil
 	}
+}
+
+func (n *node) handleNodeQuit() {
+	// TODO
 }
 
 func clientConnect(remoteAddr string) error {
@@ -184,50 +226,69 @@ func clientConnect(remoteAddr string) error {
 	if err != nil {
 		return err
 	}
-	// wrap the code in a version check msg
-	// incomingMeta, err := retrieveNetMeta(wrapper)
-	// if err != nil {
-	// 	return err
-	// }
 	remoteId, err := wrapper.ReadMessage()
-	// wrap the code in a version check msg
-	// latestMeta := getLatestMeta()
-	// err = wrapper.WriteMessageSlice(latestMeta)
 	if err != nil {
 		return err
 	}
-	// TODO: add remote node into metadata
-	ignore(remoteId)
-	// TODO: add remote node into the connected map
+	n := addOrRetrieveNode(remoteId, remoteAddr)
+	err = sendInfoAboutSelf(mySession.id, myAddr, wrapper)
+	if err != nil {
+		return err
+	}
+	return establishConnection(n, wrapper)
+}
+
+func (n *node) connect() error {
+	wrapper, err := dial(dialingTypeClientConnect, n.addr)
+	if err != nil {
+		return err
+	}
+	matches, err := checkId(wrapper, n.id)
+	if err != nil {
+		wrapper.Close()
+		return err
+	}
+	if matches {
+		err = sendInfoAboutSelf(mySession.id, myAddr, wrapper)
+		if err != nil {
+			return err
+		}
+		return establishConnection(n, wrapper)
+	} else {
+		wrapper.Close()
+		n.handleNodeQuit()
+		return nil
+	}
+}
+
+func sendInfoAboutSelf(id, addr string, wrapper *ConnWrapper) error {
+	err := wrapper.WriteMessage(id)
+	if err != nil {
+		wrapper.Close()
+		return err
+	}
+	err = wrapper.WriteMessage(addr)
+	if err != nil {
+		wrapper.Close()
+	}
+	return err
+}
+
+func establishConnection(n *node, wrapper *ConnWrapper) error {
+	msg := createVersionCheckMsg()
+	rawMsg, _ := json.Marshal(msg)
+	err := wrapper.WriteMessageSlice(rawMsg)
+	if err != nil {
+		wrapper.Close()
+		return err
+	}
+	addToConnectedPool(n, wrapper)
 	go foreverRead(wrapper)
-	//handleIncomingNetMeta(incomingMeta)
 	return nil
 }
 
-func ignore(v interface{}) {
-
-}
-
-func connect(remoteAddr string) error {
-	wrapper, err := dial(dialingTypeClientConnect, remoteAddr)
-	if err != nil {
-		return err
-	}
-	incomingMeta, err := retrieveNetMeta(wrapper)
-	if err != nil {
-		return err
-	}
-	remoteId, err := wrapper.ReadMessage()
-	ignore(remoteId)
-	latestMeta := getLatestMeta()
-	err = wrapper.WriteMessageSlice(latestMeta)
-	if err != nil {
-		return err
-	}
-	// TODO: add remote node into metadata
-	// TODO: add remote node into the connected map
-	handleIncomingNetMeta(incomingMeta)
-	return nil
+func addToConnectedPool(n *node, wrapper *ConnWrapper) {
+	// TODO
 }
 
 func shouldPoke(localAddr, remoteAddr string) bool {
@@ -294,7 +355,7 @@ func retrieveNetMeta(wrapper *ConnWrapper) (NetMeta, error) {
 }
 
 func handleIncomingNetMeta(meta NetMeta) {
-
+	// TODO
 }
 
 // TODO: not too sure how to organize yet

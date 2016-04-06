@@ -11,8 +11,8 @@ func Initialize(addr string) (string, error) {
 	myBroadcastChan = make(chan Message, 15)
 	myMsgChan = make(chan Message)
 	myNetMeta = NewNetMeta()
-	myConnectedNodes = make(map[string]*Node)
-	myDisconnectedNodes = make(map[string]*Node)
+	myConnectedNodes = make(map[string]*node)
+	myDisconnectedNodes = make(map[string]*node)
 	go serveBroadcastRequests(myBroadcastChan)
 	go serveIncomingMessages(myMsgChan)
 	var err error
