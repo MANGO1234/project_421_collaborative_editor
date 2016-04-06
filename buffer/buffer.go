@@ -6,7 +6,8 @@ import (
 
 const NO_OPERATION = 0
 const INSERT = 1
-const DELETE = 2
+const REMOTE_INSERT = 2
+const DELETE = 3
 
 type BufferOperation struct {
 	Type byte
@@ -210,6 +211,19 @@ func (buf *Buffer) Insert(pos int, ch byte) {
 	buf.Resize(buf.width)
 }
 
+// only difference is < vs <= that removes anomaly when a remote insertion happen at the cursor location
+// the cursor moving forward cause interleaving inserts between two sites
+func (buf *Buffer) RemoteInsert(pos int, ch byte) {
+	_, currentX, _, currentLine := buf.findPos(pos)
+	currentLine.Bytes = append(currentLine.Bytes, 0)
+	copy(currentLine.Bytes[currentX+1:], currentLine.Bytes[currentX:])
+	currentLine.Bytes[currentX] = ch
+	if pos < buf.currentPosition {
+		buf.currentPosition++
+	}
+	buf.Resize(buf.width)
+}
+
 func (buf *Buffer) DeleteAtCurrent() {
 	if buf.numberOfChars > 0 {
 		buf.Delete(buf.currentPosition)
@@ -234,6 +248,8 @@ func (buf *Buffer) Delete(pos int) {
 func (buf *Buffer) ApplyOperation(bufOp BufferOperation) {
 	if bufOp.Type == INSERT {
 		buf.Insert(bufOp.Pos, bufOp.Atom)
+	} else if bufOp.Type == REMOTE_INSERT {
+		buf.RemoteInsert(bufOp.Pos, bufOp.Atom)
 	} else if bufOp.Type == DELETE {
 		buf.Delete(bufOp.Pos)
 	}

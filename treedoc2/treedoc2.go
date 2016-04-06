@@ -174,7 +174,7 @@ func (doc *Document) InsertNew(operation Operation) buffer.BufferOperation {
 	}
 	updateSize(doc, newNode, 1)
 	pos := calcPos(doc, newNode, int(operation.N))
-	return buffer.BufferOperation{Type: buffer.INSERT, Pos: pos, Atom: operation.Atom}
+	return buffer.BufferOperation{Type: buffer.REMOTE_INSERT, Pos: pos, Atom: operation.Atom}
 }
 
 func (doc *Document) InsertRoot(operation Operation) buffer.BufferOperation {
@@ -188,7 +188,7 @@ func (doc *Document) InsertRoot(operation Operation) buffer.BufferOperation {
 	doc.Doc = insertNode(doc.Doc, newNode)
 	updateSize(doc, newNode, 1)
 	pos := calcPos(doc, newNode, int(operation.N))
-	return buffer.BufferOperation{Type: buffer.INSERT, Pos: pos, Atom: operation.Atom}
+	return buffer.BufferOperation{Type: buffer.REMOTE_INSERT, Pos: pos, Atom: operation.Atom}
 }
 
 func (doc *Document) Delete(operation Operation) buffer.BufferOperation {
@@ -214,7 +214,7 @@ func (doc *Document) Insert(operation Operation) buffer.BufferOperation {
 	node.Atoms[operation.N] = Atom{State: ALIVE, Atom: operation.Atom, Left: atom.Left, Size: atom.Size + 1}
 	updateSize(doc, node, 1)
 	pos := calcPos(doc, node, int(operation.N))
-	return buffer.BufferOperation{Type: buffer.INSERT, Pos: pos, Atom: operation.Atom}
+	return buffer.BufferOperation{Type: buffer.REMOTE_INSERT, Pos: pos, Atom: operation.Atom}
 }
 
 // ***************************************************************************************
