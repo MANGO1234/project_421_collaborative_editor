@@ -19,7 +19,13 @@ func (seq *LineSequence) NextWord() []byte {
 		seq.currentX = 0
 	}
 
-	if seq.lines.Next == nil {
+	// last "/n" sentinel
+	if seq.lines.Next == nil && seq.currentX == len(seq.lines.Bytes)-1 {
+		seq.currentX++
+		return nil
+	}
+
+	if seq.lines == nil {
 		return nil
 	}
 

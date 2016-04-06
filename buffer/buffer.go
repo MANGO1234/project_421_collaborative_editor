@@ -93,7 +93,7 @@ func SeqToLines(seq WordSequence, width int) (*Line, int, int) {
 }
 
 func (buf *Buffer) Resize(width int) {
-	buf.lines, buf.numberOfLines, buf.numberOfChars = SeqToLines(NewStringSequence(buf.ToString()), width)
+	buf.lines, buf.numberOfLines, buf.numberOfChars = SeqToLines(NewLineSequence(buf.lines), width)
 	buf.SetPosition(buf.currentPosition)
 	buf.width = width
 }
