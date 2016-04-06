@@ -1,10 +1,14 @@
 package version
 
+import (
+	"../treedoc2"
+)
+
 type QueueElem struct {
 	Vector    VersionVector
 	Id        SiteId
 	Version   uint32
-	Operation Operation
+	Operation treedoc2.Operation
 }
 
 type VectorQueue struct {
@@ -22,6 +26,10 @@ func (queue *VectorQueue) Size() int {
 
 func (queue *VectorQueue) Vector() VersionVector {
 	return queue.vector.Copy()
+}
+
+func (queue *VectorQueue) IncrementVector(id SiteId, versionNum uint32) {
+	queue.vector.IncrementTo(id, versionNum)
 }
 
 // enqueue an operation and returns list of operation that's ready

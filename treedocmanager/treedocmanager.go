@@ -5,7 +5,7 @@ package treedocmanager
 
 import (
 	"../treedoc2"
-	"encoding/binary"
+
 	"fmt"
 )
 
@@ -20,8 +20,8 @@ func CreateTreedoc(uuid string) {
 func Insert(atom byte, cursorPos int) {
 	myOpVersion++
 	id := NewOperationID(myUUID, myOpVersion)
-	operation := treedoc2.InsertPos(myDoc, id, cursorPos, atom)
-	broadcastOperation(myOpVersion, myUUID, operation)
+	operation := treedoc2.InsertPos(myDoc, id.toNodeId(), cursorPos, atom)
+	broadcastOperation(id, operation)
 	UpdateVersion(id, operation)
 }
 

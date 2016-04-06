@@ -1,6 +1,7 @@
 package version
 
 import (
+	"encoding/json"
 	"github.com/satori/go.uuid"
 )
 
@@ -83,18 +84,22 @@ func (v1 VersionVector) Compare(v2 VersionVector) int {
 }
 
 func (id SiteId) ToString() string {
-	newUUID, _ := uuid.FromBytes(id)
+	var idBytes []byte
+	copy(idBytes, id[:])
+	newUUID, _ := uuid.FromBytes(idBytes)
 	return newUUID.String()
 }
 
 func NewSiteId(id string) SiteId {
 	newUUID, _ := uuid.FromString(id)
-	return newUUID.Bytes()
+	var siteId [16]byte
+	copy(siteId[:], newUUID.Bytes())
+	return siteId
 }
 
-func (version *VersionVector) MarshalJSON([]byte, error) {
+func (version *VersionVector) MarshalJSON() ([]byte, error) {
 	newVector := make(map[string]uint32)
-	for k, v := range version {
+	for k, v := range *version {
 		newVector[k.ToString()] = v
 	}
 	return json.Marshal(newVector)
@@ -108,7 +113,7 @@ func (version *VersionVector) UnmarshalJSON(data []byte) error {
 
 	for k, v := range newVector {
 		id := NewSiteId(k)
-		version[id] = v
+		(*version)[id] = v
 	}
 
 	return nil

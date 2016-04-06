@@ -6,15 +6,15 @@ import (
 	"../treedoc2"
 	"../version"
 	"encoding/binary"
-	"fmt"
 	"github.com/satori/go.uuid"
+	"sync"
 )
 
 type OperationID [20]byte
 
 type versionInfo struct {
 	sync.RWMutex
-	versionQueue version.VectorQueue
+	versionQueue *version.VectorQueue
 }
 
 type operationLog struct {
@@ -24,11 +24,12 @@ type operationLog struct {
 
 // following fields keep track of treedoc management info
 var (
-	myDoc          *treedoc2.Document
-	myUUID         []byte
-	myVersionInfo  versionInfo
-	myOpVersion    uint32
-	myOperationLog operationLog
+	myDoc           *treedoc2.Document
+	myUUID          []byte
+	myVersionInfo   versionInfo
+	myOpVersion     uint32
+	myOperationLog  operationLog
+	myVersionVector version.VersionVector
 )
 
 // initialize internal fields
@@ -48,7 +49,7 @@ func NewOperationID(uuid []byte, version uint32) OperationID {
 }
 
 // given a operation id, return its uuid and version number
-func SeparateOperationID(id OperationID) ([]byte, uint32) {
+func SeparateOperationID(id OperationID) ([16]byte, uint32) {
 	var uuid [16]byte
 	copy(uuid[:], id[:16])
 	version := bytesToUint32(id[16:])
@@ -57,17 +58,18 @@ func SeparateOperationID(id OperationID) ([]byte, uint32) {
 
 // return a new queue elem to be broadcasted
 func NewQueueElem(id OperationID, operation treedoc2.Operation) version.QueueElem {
-	uuid, version := SeparateOperationID(id)
+	uuid, versionNum := SeparateOperationID(id)
 	versionVect := myVersionInfo.getVersionVector()
-	queueElem := version.QueueElem{Vector: versionVect, Id: uuid, Version: version, Operation: operation}
+	queueElem := version.QueueElem{Vector: versionVect, Id: uuid, Version: versionNum, Operation: operation}
+	return queueElem
 }
 
 // update management data after local operation is performed
 func UpdateVersion(opID OperationID, operation treedoc2.Operation) {
 	// add operations to op log
-	myOperationLog.add(id, operation)
+	myOperationLog.add(opID, operation)
 	// increment local version info
-	uuid, version := SeparateOperationID(id)
+	uuid, version := SeparateOperationID(opID)
 	myVersionInfo.update(uuid, version)
 }
 
@@ -80,13 +82,19 @@ func (opLog operationLog) add(opID OperationID, operation treedoc2.Operation) {
 func (versioninfo versionInfo) getVersionVector() version.VersionVector {
 	versioninfo.RLock()
 	defer versioninfo.RUnlock()
-	return versioninfo.vector.Copy()
+	return versioninfo.versionQueue.Vector()
 }
 
 func (versioninfo versionInfo) update(id version.SiteId, version uint32) {
 	versioninfo.Lock()
 	defer versioninfo.Unlock()
-	versioninfo.vector.IncrementTo(id, version)
+	versioninfo.versionQueue.IncrementVector(id, version)
+}
+
+func (operationId OperationID) toNodeId() treedoc2.NodeId {
+	var id treedoc2.NodeId
+	copy(id[:], operationId[:])
+	return id
 }
 
 // *********  helpers  ****** //
@@ -100,8 +108,8 @@ func bytesToUint32(bytes []byte) uint32 {
 	return binary.BigEndian.Uint32(bytes)
 }
 
-func uuidToBytes(uuid) []byte {
-	givenUUID, _ := uuid.FromString(uuid)
+func uuidToBytes(id string) []byte {
+	givenUUID, _ := uuid.FromString(id)
 	bytesUUID := givenUUID.Bytes()
 	return bytesUUID
 }
@@ -112,5 +120,5 @@ func newVersionInfo() versionInfo {
 }
 
 func newOperationLog() operationLog {
-	return operationLog{operations: make(map[VersionID]treedoc2.Operation)}
+	return operationLog{operations: make(map[OperationID]treedoc2.Operation)}
 }
