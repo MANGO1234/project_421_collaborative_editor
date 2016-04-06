@@ -1,11 +1,11 @@
 package version
 
 import (
+	. "../common"
 	"encoding/json"
 	"github.com/satori/go.uuid"
 )
 
-type SiteId [16]byte
 type VersionVector map[SiteId]uint32
 
 const LESS_THAN = -1
@@ -81,13 +81,6 @@ func (v1 VersionVector) Compare(v2 VersionVector) int {
 		}
 	}
 	return r
-}
-
-func (id SiteId) ToString() string {
-	var idBytes []byte
-	copy(idBytes, id[:])
-	newUUID, _ := uuid.FromBytes(idBytes)
-	return newUUID.String()
 }
 
 func NewSiteId(id string) SiteId {

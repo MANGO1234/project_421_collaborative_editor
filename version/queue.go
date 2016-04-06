@@ -1,6 +1,7 @@
 package version
 
 import (
+	. "../common"
 	"../treedoc2"
 )
 

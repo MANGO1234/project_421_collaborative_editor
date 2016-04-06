@@ -3,6 +3,7 @@ package treedocmanager
 // this part of treedocmanager deals with declaration & management of internal data needed by treedocmanager
 
 import (
+	. "../common"
 	"../treedoc2"
 	"../version"
 	"encoding/binary"
@@ -24,26 +25,21 @@ type operationLog struct {
 
 // following fields keep track of treedoc management info
 var (
-	myDoc           *treedoc2.Document
-	myUUID          []byte
-	myVersionInfo   versionInfo
-	myOpVersion     uint32
-	myOperationLog  operationLog
-	myVersionVector version.VersionVector
+	myVersionInfo  versionInfo
+	myOperationLog operationLog
 )
 
 // initialize internal fields
-func InitializedFields(uuid string) {
-	myUUID = uuidToBytes(uuid)
+func InitializedFields() {
 	myVersionInfo = newVersionInfo()
 	myOperationLog = newOperationLog()
 }
 
-// given uuid and version, return operation id
-func NewOperationID(uuid []byte, version uint32) OperationID {
-	versionByte := uint32ToBytes(version)
+// given uuid and clock, return node id
+func NewNodeId(uuid SiteId, clock uint32) treedoc2.NodeId {
+	versionByte := uint32ToBytes(clock)
 	var ID [20]byte
-	copy(ID[:], uuid)
+	copy(ID[:], uuid[:])
 	copy(ID[16:], versionByte)
 	return ID
 }
@@ -85,7 +81,7 @@ func (versioninfo versionInfo) getVersionVector() version.VersionVector {
 	return versioninfo.versionQueue.Vector()
 }
 
-func (versioninfo versionInfo) update(id version.SiteId, version uint32) {
+func (versioninfo versionInfo) update(id SiteId, version uint32) {
 	versioninfo.Lock()
 	defer versioninfo.Unlock()
 	versioninfo.versionQueue.IncrementVector(id, version)

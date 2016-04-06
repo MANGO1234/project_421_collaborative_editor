@@ -2,6 +2,7 @@ package gui
 
 import (
 	"../buffer"
+	. "../common"
 	"../treedocmanager"
 	"bytes"
 	"github.com/nsf/termbox-go"
@@ -63,8 +64,7 @@ func InitEditor() error {
 		build.WriteString(strconv.Itoa(i))
 		build.WriteString("\n")
 	}
-	doc := treedocmanager.NewDocumentModel("aaaaaaaaaaaaaaaa", width)
-	//	buf := StringToBuffer(build.String(), width)
+	doc := treedocmanager.NewDocumentModel(StringToSiteId("aaaaaaaaaaaaaaaa"), width)
 	DrawLines(doc.Buffer.Lines(), height)
 	termbox.SetCursor(0, 0)
 	termbox.Flush()

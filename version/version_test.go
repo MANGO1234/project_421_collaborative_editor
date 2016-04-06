@@ -1,6 +1,7 @@
 package version
 
 import (
+	. "../common"
 	"reflect"
 	"runtime/debug"
 	"testing"
@@ -13,15 +14,9 @@ func assertEqual(t *testing.T, exp, got interface{}) {
 	}
 }
 
-func newId(id string) SiteId {
-	var b [16]byte
-	copy(b[:], id[:])
-	return b
-}
-
-var A_ID = newId("aaaaaaaaaaaaaaaa")
-var B_ID = newId("bbbbbbbbbbbbbbbb")
-var C_ID = newId("cccccccccccccccc")
+var A_ID = StringToSiteId("aaaaaaaaaaaaaaaa")
+var B_ID = StringToSiteId("bbbbbbbbbbbbbbbb")
+var C_ID = StringToSiteId("cccccccccccccccc")
 
 func TestIncrement(t *testing.T) {
 	v := NewVector()

@@ -2,38 +2,47 @@ package treedocmanager
 
 import (
 	"../buffer"
+	. "../common"
 	"../treedoc2"
+	"../version"
+	"sync"
 )
 
 type DocumentModel struct {
-	nodeIdClock uint32
-	uuid        string
-	Treedoc     *treedoc2.Document
-	Buffer      *buffer.Buffer
+	sync.RWMutex
+	OwnerId       SiteId
+	OpVersion     uint32
+	NodeIdClock   uint32
+	CurrentNodeId treedoc2.NodeId
+	Treedoc       *treedoc2.Document
+	Buffer        *buffer.Buffer
+	Log           *OperationLog
+	Queue         *version.VectorQueue
 }
 
-func NewDocumentModel(uuid string, width int) *DocumentModel {
-	newDoc := treedoc2.NewDocument()
-	myDoc = newDoc
-	InitializedFields(uuid)
+func NewDocumentModel(id SiteId, width int) *DocumentModel {
+	InitializedFields()
 	return &DocumentModel{
-		uuid:    uuid,
+		OwnerId: id,
 		Treedoc: treedoc2.NewDocument(),
 		Buffer:  buffer.StringToBuffer("", width),
+		Queue:   version.NewQueue(),
+		Log:     NewLog(),
 	}
 }
 
 func (model *DocumentModel) LocalInsert(atom byte) {
 	pos := model.Buffer.GetPosition()
 	model.Buffer.InsertAtCurrent(atom)
-	id := NewOperationID(myUUID, model.nodeIdClock)
-	operation := treedoc2.InsertPos(model.Treedoc, id.toNodeId(), pos, atom)
+	id := NewNodeId(model.OwnerId, model.NodeIdClock)
+	operation := treedoc2.InsertPos(model.Treedoc, id, pos, atom)
 	if operation.Type == treedoc2.INSERT_NEW || operation.Type == treedoc2.INSERT_ROOT {
-		model.nodeIdClock++
+		model.NodeIdClock++
 	}
-	myOpVersion++
+	model.Log.Write(model.OwnerId, model.OpVersion, operation)
+	model.OpVersion++
 	model.AssertEqual()
-	BroadcastOperation(myOpVersion, operation)
+	BroadcastOperation(model.OpVersion, operation)
 }
 
 func (model *DocumentModel) LocalBackspace() {
@@ -43,9 +52,10 @@ func (model *DocumentModel) LocalBackspace() {
 	}
 	model.Buffer.BackspaceAtCurrent()
 	operation := treedoc2.DeletePos(model.Treedoc, pos)
-	myOpVersion++
+	model.Log.Write(model.OwnerId, model.OpVersion, operation)
+	model.OpVersion++
 	model.AssertEqual()
-	BroadcastOperation(myOpVersion, operation)
+	BroadcastOperation(model.OpVersion, operation)
 }
 
 func (model *DocumentModel) LocalDelete() {
@@ -55,9 +65,30 @@ func (model *DocumentModel) LocalDelete() {
 	}
 	model.Buffer.DeleteAtCurrent()
 	operation := treedoc2.DeletePos(model.Treedoc, pos)
-	myOpVersion++
+	model.Log.Write(model.OwnerId, model.OpVersion, operation)
+	model.OpVersion++
 	model.AssertEqual()
-	BroadcastOperation(myOpVersion, operation)
+	BroadcastOperation(model.OpVersion, operation)
+}
+
+func (model *DocumentModel) RemoteOperation(vector version.VersionVector, id SiteId, opVersion uint32, operation treedoc2.Operation) {
+	queueElems := model.Queue.Enqueue(version.QueueElem{
+		Vector:    vector,
+		Id:        id,
+		Version:   opVersion,
+		Operation: operation,
+	})
+	for _, elem := range queueElems {
+		bufOp := treedoc2.ApplyOperation(model.Treedoc, elem.Operation)
+		if bufOp.Type == treedoc2.INSERT {
+			model.Buffer.Insert(bufOp.Pos, bufOp.Atom)
+		} else if bufOp.Type == treedoc2.DELETE {
+			model.Buffer.Delete(bufOp.Pos)
+		}
+		model.Log.Write(elem.Id, elem.Version, elem.Operation)
+		model.AssertEqual()
+	}
+	UpdateGUI()
 }
 
 func (model *DocumentModel) AssertEqual() {
@@ -67,5 +98,9 @@ func (model *DocumentModel) AssertEqual() {
 }
 
 func BroadcastOperation(operationVersion uint32, operation treedoc2.Operation) {
+
+}
+
+func UpdateGUI() {
 
 }
