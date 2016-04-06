@@ -22,6 +22,7 @@ func newId(id string) NodeId {
 var A_ID0 = newId("aaaaaaaaaaaaaaaa0000")
 var A_ID1 = newId("aaaaaaaaaaaaaaaa0001")
 var A_ID2 = newId("aaaaaaaaaaaaaaaa0002")
+var A_ID3 = newId("aaaaaaaaaaaaaaaa0003")
 var B_ID0 = newId("bbbbbbbbbbbbbbbb0000")
 var B_ID1 = newId("bbbbbbbbbbbbbbbb0001")
 var C_ID0 = newId("cccccccccccccccc0000")
@@ -161,17 +162,20 @@ func TestDeletePos(t *testing.T) {
 	}
 
 	for i := 0; i < 7; i++ {
-		d := NewTestDoc()
-		DeletePos(d, i)
-		DeletePos(d, 6-i)
-		str := "cfadeghb"
-		str = str[:i] + str[i+1:]
-		str = str[:6-i] + str[6-i+1:]
-		assertEqual(t, str, DocToString(d))
-		assertEqual(t, 6, d.Size)
-		x, y := DocStat(d)
-		assertEqual(t, 6, x)
-		assertEqual(t, 2, y)
+		for j := 0; j < 6; j++ {
+			d := NewTestDoc()
+			str := "cfadeghb"
+			DeletePos(d, i)
+			str = str[:i] + str[i+1:]
+			assertEqual(t, str, DocToString(d))
+			DeletePos(d, j)
+			str = str[:j] + str[j+1:]
+			assertEqual(t, str, DocToString(d))
+			assertEqual(t, 6, d.Size)
+			x, y := DocStat(d)
+			assertEqual(t, 6, x)
+			assertEqual(t, 2, y)
+		}
 	}
 
 	d := NewTestDoc()
@@ -193,7 +197,6 @@ func TestDeletePos(t *testing.T) {
 
 func TestBufferOperationReturn(t *testing.T) {
 	d := NewTestDoc()
-	DebugDoc(d)
 	op := ApplyOperation(d, Operation{Type: DELETE, Id: C_ID1, N: 1})
 	assertEqual(t, DELETE, op.Type)
 	assertEqual(t, 5, op.Pos)
@@ -228,12 +231,25 @@ func TestBufferOperationReturn(t *testing.T) {
 	assertEqual(t, 6, op.Pos)
 }
 
-//func TestInsertPos(t *testing.T) {
-//	for i := 0; i < 8; i++ {
-//		d := NewTestDoc()
-//		InsertPos(d, A_ID2, i, 'z')
-//		DebugDoc(d)
-//		assertEqual(t, "cfadeghb"[:i]+"z"+"cfadeghb"[i:], DocToString(d))
-//		assertEqual(t, 9, d.Size)
-//	}
-//}
+func TestInsertPos(t *testing.T) {
+	for i := 0; i < 9; i++ {
+		d := NewTestDoc()
+		InsertPos(d, A_ID2, i, 'z')
+		assertEqual(t, "cfadeghb"[:i]+"z"+"cfadeghb"[i:], DocToString(d))
+		assertEqual(t, 9, d.Size)
+	}
+
+	for i := 0; i < 9; i++ {
+		for j := 0; j < 10; j++ {
+			d := NewTestDoc()
+			str := "cfadeghb"
+			InsertPos(d, A_ID2, i, 'z')
+			str = str[:i] + "z" + str[i:]
+			assertEqual(t, str, DocToString(d))
+			InsertPos(d, A_ID3, j, 'y')
+			str = str[:j] + "y" + str[j:]
+			assertEqual(t, str, DocToString(d))
+			assertEqual(t, 10, d.Size)
+		}
+	}
+}
