@@ -228,9 +228,6 @@ func (buf *Buffer) SetPosition(pos int) {
 	buf.currentX = 0
 	acc := 0
 	for {
-		if buf.currentLine == nil {
-			panic("a")
-		}
 		if acc+len(buf.currentLine.Bytes) > pos {
 			buf.currentX = pos - acc
 			break

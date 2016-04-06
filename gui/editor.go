@@ -64,7 +64,7 @@ func InitEditor() error {
 		build.WriteString(strconv.Itoa(i))
 		build.WriteString("\n")
 	}
-	doc := treedocmanager.NewDocumentModel(StringToSiteId("aaaaaaaaaaaaaaaa"), width)
+	doc := treedocmanager.NewDocumentModel(StringToSiteId("aaaaaaaaaaaaaaaa"), width-1)
 	DrawLines(doc.Buffer.Lines(), height)
 	termbox.SetCursor(0, 0)
 	termbox.Flush()
@@ -154,7 +154,7 @@ func InitEditor() error {
 		case termbox.EventResize:
 			width = ev.Width
 			height = ev.Height
-			doc.Buffer.Resize(width)
+			doc.Buffer.Resize(width - 1)
 			// this is a bug within the library, without this call clear would panic when
 			// cursor is outside of resized window
 			termbox.HideCursor()
