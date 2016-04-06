@@ -21,11 +21,12 @@ type DocumentModel struct {
 
 func NewDocumentModel(id SiteId, width int) *DocumentModel {
 	return &DocumentModel{
-		OwnerId: id,
-		Treedoc: treedoc2.NewDocument(),
-		Buffer:  buffer.StringToBuffer("", width),
-		Queue:   version.NewQueue(),
-		Log:     NewLog(),
+		OwnerId:   id,
+		OpVersion: 1,
+		Treedoc:   treedoc2.NewDocument(),
+		Buffer:    buffer.StringToBuffer("", width),
+		Queue:     version.NewQueue(),
+		Log:       NewLog(),
 	}
 }
 
@@ -96,5 +97,4 @@ func BroadcastOperation(operationVersion uint32, operation treedoc2.Operation) {
 }
 
 func UpdateGUI() {
-
 }

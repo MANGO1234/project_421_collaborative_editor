@@ -12,6 +12,12 @@ func NewNodeId(siteId SiteId, clock uint32) NodeId {
 	return ID
 }
 
+func StringToNodeId(id string) NodeId {
+	var b [20]byte
+	copy(b[:], id[:])
+	return b
+}
+
 func SeparateNodeID(id NodeId) (SiteId, uint32) {
 	var siteId SiteId
 	copy(siteId[:], id[:16])
