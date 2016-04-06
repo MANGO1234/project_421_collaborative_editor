@@ -4,7 +4,7 @@ type QueueElem struct {
 	Vector    VersionVector
 	Id        SiteId
 	Version   uint32
-	Operation interface{}
+	Operation Operation
 }
 
 type VectorQueue struct {

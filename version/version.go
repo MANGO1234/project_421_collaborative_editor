@@ -1,5 +1,9 @@
 package version
 
+import (
+	"github.com/satori/go.uuid"
+)
+
 type SiteId [16]byte
 type VersionVector map[SiteId]uint32
 
@@ -76,4 +80,36 @@ func (v1 VersionVector) Compare(v2 VersionVector) int {
 		}
 	}
 	return r
+}
+
+func (id SiteId) ToString() string {
+	newUUID, _ := uuid.FromBytes(id)
+	return newUUID.String()
+}
+
+func NewSiteId(id string) SiteId {
+	newUUID, _ := uuid.FromString(id)
+	return newUUID.Bytes()
+}
+
+func (version *VersionVector) MarshalJSON([]byte, error) {
+	newVector := make(map[string]uint32)
+	for k, v := range version {
+		newVector[k.ToString()] = v
+	}
+	return json.Marshal(newVector)
+}
+
+func (version *VersionVector) UnmarshalJSON(data []byte) error {
+	newVector := make(map[string]uint32)
+	if err := json.Unmarshal(data, &newVector); err != nil {
+		return err
+	}
+
+	for k, v := range newVector {
+		id := NewSiteId(k)
+		version[id] = v
+	}
+
+	return nil
 }
