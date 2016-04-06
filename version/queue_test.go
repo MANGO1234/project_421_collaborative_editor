@@ -120,3 +120,28 @@ func TestEnqueue4(t *testing.T) {
 	assertEqual(t, uint32(1), result[1].Version)
 	assertEqual(t, uint32(5), result[2].Version)
 }
+
+func TestEnqueueDuplicateOperations(t *testing.T) {
+	q := NewQueue()
+	result := q.Enqueue(QueueElem{Vector: NewTestVector(1, 0, 0), Id: A_ID, Version: 2})
+	assertEqual(t, 0, len(result))
+	assertEqual(t, 1, q.Size())
+	result = q.Enqueue(QueueElem{Vector: NewTestVector(1, 0, 1), Id: A_ID, Version: 2})
+	assertEqual(t, 0, len(result))
+	assertEqual(t, 2, q.Size())
+	result = q.Enqueue(QueueElem{Vector: NewTestVector(1, 0, 2), Id: A_ID, Version: 2})
+	assertEqual(t, 0, len(result))
+	assertEqual(t, 3, q.Size())
+	result = q.Enqueue(QueueElem{Vector: NewTestVector(0, 0, 0), Id: C_ID, Version: 1})
+	assertEqual(t, 1, len(result))
+	assertEqual(t, 3, q.Size())
+	result = q.Enqueue(QueueElem{Vector: NewTestVector(0, 0, 1), Id: C_ID, Version: 2})
+	assertEqual(t, 1, len(result))
+	assertEqual(t, 3, q.Size())
+	result = q.Enqueue(QueueElem{Vector: NewTestVector(0, 0, 0), Id: A_ID, Version: 1})
+	assertEqual(t, 2, len(result))
+	assertEqual(t, 0, q.Size())
+	assertEqual(t, uint32(2), q.Vector().Get(A_ID))
+	assertEqual(t, uint32(0), q.Vector().Get(B_ID))
+	assertEqual(t, uint32(2), q.Vector().Get(C_ID))
+}
