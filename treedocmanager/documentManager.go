@@ -21,7 +21,6 @@ type DocumentModel struct {
 }
 
 func NewDocumentModel(id SiteId, width int) *DocumentModel {
-	InitializedFields()
 	return &DocumentModel{
 		OwnerId: id,
 		Treedoc: treedoc2.NewDocument(),
@@ -34,7 +33,7 @@ func NewDocumentModel(id SiteId, width int) *DocumentModel {
 func (model *DocumentModel) LocalInsert(atom byte) {
 	pos := model.Buffer.GetPosition()
 	model.Buffer.InsertAtCurrent(atom)
-	id := NewNodeId(model.OwnerId, model.NodeIdClock)
+	id := treedoc2.NewNodeId(model.OwnerId, model.NodeIdClock)
 	operation := treedoc2.InsertPos(model.Treedoc, id, pos, atom)
 	if operation.Type == treedoc2.INSERT_NEW || operation.Type == treedoc2.INSERT_ROOT {
 		model.NodeIdClock++

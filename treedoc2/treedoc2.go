@@ -7,8 +7,6 @@ import (
 	"strconv"
 )
 
-type NodeId [20]byte
-
 type Document struct {
 	Size  int
 	Doc   []*DocNode
@@ -259,15 +257,6 @@ func immediateNextEmptyUninitializedNode(i int, atoms []Atom) int {
 		return -1
 	}
 	return i
-}
-
-func equalId(a NodeId, b NodeId) bool {
-	for i := 0; i < 16; i++ {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }
 
 func findNodePos(pos int, acc int, nodes []*DocNode) (int, *DocNode) {
