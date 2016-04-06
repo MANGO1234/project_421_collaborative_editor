@@ -232,6 +232,12 @@ func TestBufferOperationReturn(t *testing.T) {
 }
 
 func TestInsertPos(t *testing.T) {
+	d := NewDocument()
+	op := InsertPos(d, A_ID0, 0, 'z')
+	assertEqual(t, "z", DocToString(d))
+	assertEqual(t, op.Type, INSERT_ROOT)
+	assertEqual(t, 1, len(d.Doc))
+
 	for i := 0; i < 9; i++ {
 		d := NewTestDoc()
 		InsertPos(d, A_ID2, i, 'z')
