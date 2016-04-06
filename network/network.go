@@ -18,12 +18,6 @@ import (
 	"time"
 )
 
-type node struct {
-	id   string
-	addr string
-	conn *ConnWrapper
-}
-
 type ConnWrapper struct {
 	conn   net.Conn
 	reader *util.MessageReader
@@ -121,6 +115,7 @@ func serveIncomingMessages(in <-chan Message) {
 		switch msg.Type {
 		case msgTypeNetMetaUpdate:
 			// TODO
+			//handleIncomingNetMeta(meta)
 		case msgTypeTreedocOp:
 			// TODO
 		case msgTypeVersionCheck:
