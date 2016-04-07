@@ -10,7 +10,6 @@
 package network
 
 import (
-	"encoding/json"
 	"errors"
 )
 
@@ -32,13 +31,50 @@ func NewNetworkManager(addr string) (*NetworkManager, error) {
 		broadcastChan: make(chan Message, 15),
 		nodePool:      newNodePool(),
 	}
-	err := manager.startNewSession()
+	err := startNewSessionOnNetworkManager(&manager)
 	if err != nil {
 		return nil, err
 	}
 	go manager.serveBroadcastRequests()
 	go manager.serveIncomingMessages()
 	return &manager, nil
+}
+
+func (nm *NetworkManager) serveIncomingMessages() {
+	for msg := range nm.msgChan {
+		switch msg.Type {
+		case msgTypeNetMetaUpdate:
+			nm.handleIncomingNetMeta(msg.Msg)
+		case msgTypeTreedocOp:
+		// TODO
+		case msgTypeVersionCheck:
+		// TODO
+		case msgTypeSync:
+		// TODO
+		default:
+			// ignore and do nothing
+		}
+	}
+}
+
+func TODO(sth interface{}) {
+
+}
+
+func (nm *NetworkManager) handleIncomingNetMeta(incoming []byte) error {
+	incomingNetMeta, err := newNetMetaFromJson(incoming)
+	if err != nil {
+		return err
+	}
+	TODO(incomingNetMeta)
+	return nil
+	// TODO handle it
+}
+
+func (nm *NetworkManager) serveBroadcastRequests() {
+	for msg := range nm.broadcastChan {
+		nm.broadcast(msg)
+	}
 }
 
 func (nm *NetworkManager) GetCurrentId() string {
@@ -49,7 +85,7 @@ func (nm *NetworkManager) GetCurrentId() string {
 // whose listening address is remoteAddr
 func (nm *NetworkManager) ConnectTo(remoteAddr string) error {
 	if nm.session == nil {
-		err := nm.startNewSession()
+		err := startNewSessionOnNetworkManager(nm)
 		if err != nil {
 			return err
 		}
@@ -72,7 +108,7 @@ func (nm *NetworkManager) Reconnect() error {
 	if nm.session != nil {
 		return errors.New("The node is already connected!")
 	}
-	return nm.startNewSession()
+	return startNewSessionOnNetworkManager(nm)
 }
 
 // Broadcast msg asynchronously
@@ -88,32 +124,4 @@ func (nm *NetworkManager) broadcast(msg Message) {
 
 func (nm *NetworkManager) GetNetworkMetadata() string {
 	return string(nm.nodePool.getLatestNetMetaJsonPrettyPrint())
-}
-
-func (nm *NetworkManager) serveIncomingMessages() {
-	for msg := range nm.msgChan {
-		switch msg.Type {
-		case msgTypeNetMetaUpdate:
-			var delta NetMeta
-			err := json.Unmarshal(msg.Msg, &delta)
-			if err != nil {
-				break
-			}
-
-		case msgTypeTreedocOp:
-			// TODO
-		case msgTypeVersionCheck:
-			// TODO
-		case msgTypeSync:
-			// TODO
-		default:
-			// ignore and do nothing
-		}
-	}
-}
-
-func (nm *NetworkManager) serveBroadcastRequests() {
-	for msg := range nm.broadcastChan {
-		nm.broadcast(msg)
-	}
 }

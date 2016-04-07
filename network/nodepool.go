@@ -5,19 +5,13 @@ import (
 	"sync"
 )
 
-type NodeMeta struct {
-	Addr string
-	Left bool
-}
-
-type NetMeta map[string]NodeMeta
-
 type nodePool struct {
-	netMetaMutex     sync.RWMutex
-	poolMutex        sync.Mutex
-	netMeta          NetMeta
-	connectedPool    map[string]*node
-	disconnectedPool map[string]*node
+	netMetaMutex          sync.RWMutex
+	netMeta               NetMeta
+	connectedPoolMutex    sync.RWMutex
+	connectedPool         map[string]*node
+	disconnectedPoolMutex sync.RWMutex
+	disconnectedPool      map[string]*node
 }
 
 func newNodePool() *nodePool {
@@ -26,27 +20,6 @@ func newNodePool() *nodePool {
 	np.connectedPool = make(map[string]*node)
 	np.disconnectedPool = make(map[string]*node)
 	return &np
-}
-
-func newNetMeta() NetMeta {
-	return make(map[string]NodeMeta)
-}
-
-func newQuitNetMeta(id, addr string) NetMeta {
-	netMeta := newNetMeta()
-	netMeta[id] = NodeMeta{addr, true}
-	return netMeta
-}
-
-func newJoinNetMeta(id, addr string) NetMeta {
-	netMeta := newNetMeta()
-	netMeta[id] = NodeMeta{addr, false}
-	return netMeta
-}
-
-func (netMeta NetMeta) ToJson() []byte {
-	netMetaJson, _ := json.Marshal(netMeta)
-	return netMetaJson
 }
 
 func (np *nodePool) has(id string) bool {
@@ -63,6 +36,12 @@ func (np *nodePool) handleNewSession(s *session) {
 // func (np *nodepool) handleEndSession(s *session) {
 
 // }
+
+//func (np *nodePool) getDisconnectedNodes() []*node {
+//	np.disconnectedPoolMutex.RLock()
+//	nodes :=
+//	np.disconnectedPoolMutex.RUnlock()
+//}
 
 // return true if the update results in a change and false otherwise
 func (np *nodePool) applyReceivedUpdate(id string, newNode NodeMeta) bool {
@@ -87,6 +66,10 @@ func (np *nodePool) applyReceivedUpdates(updates NetMeta) (NetMeta, bool) {
 		return nil, false
 	}
 	return delta, true
+}
+
+func (np *nodePool) forceNodeQuit(n *node) {
+
 }
 
 func (np *nodePool) getLatestNetMetaJson() []byte {

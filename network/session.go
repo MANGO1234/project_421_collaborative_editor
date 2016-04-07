@@ -23,16 +23,7 @@ type session struct {
 	done     chan struct{}
 }
 
-func (s *session) ended() bool {
-	select {
-	case <-s.done:
-		return true
-	default:
-		return false
-	}
-}
-
-func (nm *NetworkManager) startNewSession() error {
+func startNewSessionOnNetworkManager(nm *NetworkManager) error {
 	lAddr, err := net.ResolveTCPAddr("tcp", nm.addr)
 	if err != nil {
 		return err
@@ -66,18 +57,29 @@ func (s *session) end() {
 	s.Wait()
 }
 
+func (s *session) ended() bool {
+	select {
+	case <-s.done:
+		return true
+	default:
+		return false
+	}
+}
+
 // These functions launches major network threads
 func (s *session) listenForNewConn() {
 	s.Add(1)
 	defer s.Done()
 	for {
+		conn, err := s.listener.Accept()
 		if s.ended() {
 			return
 		}
-		conn, err := s.listener.Accept()
-		if err == nil {
-			go s.handleNewConn(conn)
+		if err != nil {
+			// TODO: What else can we do in this case
+			continue
 		}
+		go s.handleNewConn(conn)
 	}
 }
 
