@@ -10,112 +10,96 @@
 package network
 
 import (
-	"../util"
-	"bufio"
 	"encoding/json"
-	"net"
-	"sync"
-	"time"
+	"errors"
 )
 
-type ConnWrapper struct {
-	conn   net.Conn
-	reader *util.MessageReader
-	writer *util.MessageWriter
+type NetworkManager struct {
+	id            string
+	addr          string
+	msgChan       chan Message
+	broadcastChan chan Message
+	nodePool      *nodePool
+	session       *session
 }
 
-// get a new ConnWrapper around a connection
-func newConnWrapper(conn net.Conn) *ConnWrapper {
-	msgWriter := util.MessageWriter{bufio.NewWriter(conn)}
-	msgReader := util.MessageReader{bufio.NewReader(conn)}
-	wrapper := ConnWrapper{conn, &msgReader, &msgWriter}
-	return &wrapper
+// NewNetworkManager initiate a new NetworkManager with listening
+// address addr to handle network operations
+func NewNetworkManager(addr string) (*NetworkManager, error) {
+	manager := NetworkManager{
+		addr:          addr,
+		msgChan:       make(chan Message),
+		broadcastChan: make(chan Message, 15),
+		nodePool:      newNodePool(),
+	}
+	err := manager.startNewSession()
+	if err != nil {
+		return nil, err
+	}
+	go manager.serveBroadcastRequests()
+	go manager.serveIncomingMessages()
+	return &manager, nil
 }
 
-func (w *ConnWrapper) Close() error {
-	return w.conn.Close()
+func (nm *NetworkManager) GetCurrentId() string {
+	return nm.id
 }
 
-func (w *ConnWrapper) WriteMessageSlice(msg []byte) error {
-	return w.writer.WriteMessageSlice(msg)
+// ConnectTo registers the current node into the network of the node
+// whose listening address is remoteAddr
+func (nm *NetworkManager) ConnectTo(remoteAddr string) error {
+	if nm.session == nil {
+		err := nm.startNewSession()
+		if err != nil {
+			return err
+		}
+	}
+	return nm.register(remoteAddr)
 }
 
-func (w *ConnWrapper) WriteMessage(msg string) error {
-	return w.writer.WriteMessage(msg)
+// Disconnect disconnects from the rest of the network voluntarily
+func (nm *NetworkManager) Disconnect() error {
+	if nm.session == nil {
+		return errors.New("Already disconnected")
+	}
+	nm.session.end()
+	nm.session = nil
+	return nil
 }
 
-func (w *ConnWrapper) ReadMessage() (string, error) {
-	return w.ReadMessage()
+// Reconnect rejoins the network with new UUID.
+func (nm *NetworkManager) Reconnect() error {
+	if nm.session != nil {
+		return errors.New("The node is already connected!")
+	}
+	return nm.startNewSession()
 }
 
-func (w *ConnWrapper) ReadMessageSlice() ([]byte, error) {
-	return w.ReadMessageSlice()
+// Broadcast msg asynchronously
+func (nm *NetworkManager) BroadcastAsync(msg Message) {
+	go func() {
+		nm.broadcastChan <- msg
+	}()
 }
 
-type Message struct {
-	Type    string
-	Visited map[string]struct{}
-	Msg     []byte
+func (nm *NetworkManager) broadcast(msg Message) {
+	// TODO
 }
 
-// type ConnectMessage struct {
-// 	Id          string
-// 	Addr        string
-// 	NetworkMeta NetMeta
-// 	// TODO: maybe the treedoc and versionvector
-// }
-
-// this is just a stub for a version vector that can be marshelled
-type SerializableVersionVector struct{}
-
-type VersionCheckMsgContent struct {
-	NetworkMeta   NetMeta
-	VersionVector SerializableVersionVector
+func (nm *NetworkManager) GetNetworkMetadata() string {
+	return string(nm.nodePool.getLatestNetMetaJsonPrettyPrint())
 }
 
-func (content *VersionCheckMsgContent) toJson() []byte {
-	contentJson, _ := json.Marshal(content)
-	return contentJson
-}
-
-// constants
-
-// how often to check version vector and network metadata in seconds
-const (
-	// how often to check if version on two nodes match
-	versionCheckInterval = 30 * time.Second
-	// how often to check whether it's time to (re)connect to disconnected nodes
-	reconnectInterval = 30 * time.Second
-)
-
-// message types of messages sent to existing connection
-const (
-	msgTypeVersionCheck  = "versioncheck"
-	msgTypeSync          = "sync"
-	msgTypeNetMetaUpdate = "netmeta"
-	msgTypeTreedocOp     = "treedocOp"
-)
-
-// TODO: we might want to abstract this out into
-// a struct and invoke functions on the struct
-// but need to put more thought on how to divide things up
-// states to keep track of
-var myAddr string
-var myMsgChan chan Message
-var myBroadcastChan chan Message
-var myNetMeta NetMeta
-var myNetMetaRWMutex sync.RWMutex
-var myConnectedNodes map[string]*node
-var myDisconnectedNodes map[string]*node
-var myConnectionMutex sync.Mutex
-var mySession *session
-
-func serveIncomingMessages(in <-chan Message) {
-	for msg := range in {
+func (nm *NetworkManager) serveIncomingMessages() {
+	for msg := range nm.msgChan {
 		switch msg.Type {
 		case msgTypeNetMetaUpdate:
-			// TODO
-			//handleIncomingNetMeta(meta)
+			var delta NetMeta
+			err := json.Unmarshal(msg.Msg, &delta)
+			if err != nil {
+				break
+			}
+
 		case msgTypeTreedocOp:
 			// TODO
 		case msgTypeVersionCheck:
@@ -128,32 +112,8 @@ func serveIncomingMessages(in <-chan Message) {
 	}
 }
 
-func serveBroadcastRequests(in <-chan Message) {
-	for msg := range in {
-		Broadcast(msg)
+func (nm *NetworkManager) serveBroadcastRequests() {
+	for msg := range nm.broadcastChan {
+		nm.broadcast(msg)
 	}
-}
-
-func NewSyncMessage(msgType string, content []byte) Message {
-	return Message{
-		msgType,
-		nil,
-		content,
-	}
-}
-
-func NewTreedocOpBroadcastMsg(content []byte) Message {
-	return NewBroadcastMessage(msgTypeTreedocOp, content)
-}
-
-func NewBroadcastMessage(msgType string, content []byte) Message {
-	return Message{
-		msgType,
-		make(map[string]struct{}),
-		content,
-	}
-}
-
-func createNetMetaUpdateMsg(meta NetMeta) Message {
-	return NewBroadcastMessage(msgTypeNetMetaUpdate, meta.ToJson())
 }

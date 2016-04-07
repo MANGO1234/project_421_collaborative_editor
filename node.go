@@ -8,7 +8,6 @@ package main
 
 import (
 	"./network"
-	// "./treedoc"
 	"./treedocmanager"
 	"./util"
 	"bufio"
@@ -23,8 +22,8 @@ func main() {
 		os.Exit(1)
 	}
 
-	nodeId, err := network.Initialize(os.Args[1])
-	treedocmanager.CreateTreedoc(nodeId)
+	networkManager, err := network.NewNetworkManager(os.Args[1])
+	treedocmanager.CreateTreedoc(networkManager.GetCurrentId()) // TODO handle change in id
 	// TODO: link cursor position and treedoc posID
 
 	util.CheckError(err)
@@ -38,14 +37,14 @@ func main() {
 			fmt.Print("connect > ")
 			scanner.Scan()
 			remoteAddr := scanner.Text()
-			id, err := network.ConnectTo(remoteAddr)
-			fmt.Println("my id:", id)
+			err = networkManager.ConnectTo(remoteAddr)
+			fmt.Println("my id:", networkManager.GetCurrentId())
 			util.PrintError(err) // TODO deal with err
 		case "disconnect":
 			// TODO: disconnect to the network
-			network.Disconnect()
+			networkManager.Disconnect()
 		case "reconnect":
-			network.Reconnect()
+			networkManager.Reconnect()
 		case "insert":
 			fmt.Print("insert > ")
 			scanner.Scan()
@@ -88,7 +87,7 @@ func main() {
 			// TODO: print current doc
 			//fmt.Println(treedoc.DocToString(mydoc))
 		case "printNetMeta":
-			fmt.Println(network.GetNetworkMetadata())
+			fmt.Println(networkManager.GetNetworkMetadata())
 		case "help":
 			// TODO: print a help menu
 		case "quit":
