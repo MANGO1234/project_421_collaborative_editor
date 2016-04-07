@@ -1,4 +1,4 @@
-package treedocmanager
+package documentmanager
 
 import (
 	"../buffer"
@@ -17,9 +17,10 @@ type DocumentModel struct {
 	Buffer      *buffer.Buffer
 	Log         *OperationLog
 	Queue       *version.VectorQueue
+	UpdateGUI   func()
 }
 
-func NewDocumentModel(id SiteId, width int) *DocumentModel {
+func NewDocumentModel(id SiteId, width int, updateGUI func()) *DocumentModel {
 	return &DocumentModel{
 		OwnerId:   id,
 		OpVersion: 1,
@@ -27,6 +28,7 @@ func NewDocumentModel(id SiteId, width int) *DocumentModel {
 		Buffer:    buffer.StringToBuffer("", width),
 		Queue:     version.NewQueue(),
 		Log:       NewLog(),
+		UpdateGUI: updateGUI,
 	}
 }
 
@@ -83,7 +85,7 @@ func (model *DocumentModel) RemoteOperation(vector version.VersionVector, id Sit
 		model.Log.Write(elem.Id, elem.Version, elem.Operation)
 		model.AssertEqual()
 	}
-	UpdateGUI()
+	model.UpdateGUI()
 }
 
 func (model *DocumentModel) AssertEqual() {
@@ -94,7 +96,4 @@ func (model *DocumentModel) AssertEqual() {
 
 func BroadcastOperation(operationVersion uint32, operation treedoc2.Operation) {
 
-}
-
-func UpdateGUI() {
 }

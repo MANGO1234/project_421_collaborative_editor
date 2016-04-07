@@ -3,13 +3,11 @@ package gui
 import (
 	"../buffer"
 	. "../common"
-	"../treedocmanager"
-	"bytes"
+	"../documentmanager"
 	"github.com/nsf/termbox-go"
-	"strconv"
 )
 
-var docModel *treedocmanager.DocumentModel
+var docModel *documentmanager.DocumentModel
 
 func DrawLines(lines *buffer.Line, height int) {
 	y := 0
@@ -31,7 +29,7 @@ func DrawLines(lines *buffer.Line, height int) {
 	}
 }
 
-func InitEditor() error {
+func InitEditor(siteId SiteId) error {
 	err := termbox.Init()
 	if err != nil {
 		return err
@@ -40,33 +38,9 @@ func InitEditor() error {
 	width, height := termbox.Size()
 	termbox.SetInputMode(termbox.InputEsc)
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
-	build := bytes.Buffer{}
-	for i := 0; i < 60; i++ {
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString("\t")
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(" ")
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString(strconv.Itoa(i))
-		build.WriteString("\n")
-	}
-	docModel = treedocmanager.NewDocumentModel(StringToSiteId("aaaaaaaaaaaaaaaa"), width-1)
+	docModel = documentmanager.NewDocumentModel(siteId, width-1, func() {
+		termbox.Interrupt()
+	})
 	DrawLines(docModel.Buffer.Lines(), height)
 	termbox.SetCursor(0, 0)
 	termbox.Flush()
@@ -177,7 +151,7 @@ func InitEditor() error {
 	}
 }
 
-func Model() *treedocmanager.DocumentModel {
+func Model() *documentmanager.DocumentModel {
 	return docModel
 }
 

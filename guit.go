@@ -19,7 +19,7 @@ func main() {
 			Type: treedoc2.INSERT_ROOT,
 			Atom: 'a',
 		})
-		gui.ForceUpdate()
+		gui.Model().UpdateGUI()
 		time.Sleep(time.Second)
 		gui.Model().RemoteOperation(version.NewVector(), ID, 2, treedoc2.Operation{
 			Id:   A_0,
@@ -27,7 +27,7 @@ func main() {
 			Type: treedoc2.INSERT,
 			Atom: 'b',
 		})
-		gui.ForceUpdate()
+		gui.Model().UpdateGUI()
 		time.Sleep(time.Second)
 		gui.Model().RemoteOperation(version.NewVector(), ID, 3, treedoc2.Operation{
 			Id:   A_0,
@@ -41,15 +41,15 @@ func main() {
 			Type: treedoc2.INSERT,
 			Atom: 'd',
 		})
-		gui.ForceUpdate()
+		gui.Model().UpdateGUI()
 		time.Sleep(time.Second)
 		gui.Model().RemoteOperation(version.NewVector(), ID, 5, treedoc2.Operation{
 			Id:   A_0,
 			N:    0,
 			Type: treedoc2.DELETE,
 		})
-		gui.ForceUpdate()
+		gui.Model().UpdateGUI()
 	}()
-	gui.InitEditor()
+	gui.InitEditor(StringToSiteId("aaaaaaaaaaaaaaaa"))
 	gui.CloseEditor()
 }

@@ -1,4 +1,4 @@
-package treedocmanager
+package documentmanager
 
 import (
 	. "../common"
