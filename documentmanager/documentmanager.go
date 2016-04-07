@@ -16,7 +16,7 @@ type DocumentModel struct {
 	Treedoc     *treedoc2.Document
 	Buffer      *buffer.Buffer
 	Log         *OperationLog
-	Queue       *version.VectorQueue
+	Queue       *OperationQueue
 	UpdateGUI   func()
 }
 
@@ -26,7 +26,7 @@ func NewDocumentModel(id SiteId, width int, updateGUI func()) *DocumentModel {
 		OpVersion: 1,
 		Treedoc:   treedoc2.NewDocument(),
 		Buffer:    buffer.StringToBuffer("", width),
-		Queue:     version.NewQueue(),
+		Queue:     NewQueue(),
 		Log:       NewLog(),
 		UpdateGUI: updateGUI,
 	}
@@ -73,7 +73,7 @@ func (model *DocumentModel) LocalDelete() {
 }
 
 func (model *DocumentModel) RemoteOperation(vector version.VersionVector, id SiteId, opVersion uint32, operation treedoc2.Operation) {
-	queueElems := model.Queue.Enqueue(version.QueueElem{
+	queueElems := model.Queue.Enqueue(QueueElem{
 		Vector:    vector,
 		Id:        id,
 		Version:   opVersion,

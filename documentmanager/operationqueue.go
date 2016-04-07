@@ -1,8 +1,9 @@
-package version
+package documentmanager
 
 import (
 	. "../common"
 	"../treedoc2"
+	. "../version"
 )
 
 type QueueElem struct {
@@ -12,29 +13,29 @@ type QueueElem struct {
 	Operation treedoc2.Operation
 }
 
-type VectorQueue struct {
+type OperationQueue struct {
 	queue  []QueueElem
 	vector VersionVector
 }
 
-func NewQueue() *VectorQueue {
-	return &VectorQueue{make([]QueueElem, 0, 4), NewVector()}
+func NewQueue() *OperationQueue {
+	return &OperationQueue{make([]QueueElem, 0, 4), NewVector()}
 }
 
-func (queue *VectorQueue) Size() int {
+func (queue *OperationQueue) Size() int {
 	return len(queue.queue)
 }
 
-func (queue *VectorQueue) Vector() VersionVector {
+func (queue *OperationQueue) Vector() VersionVector {
 	return queue.vector.Copy()
 }
 
-func (queue *VectorQueue) IncrementVector(id SiteId, versionNum uint32) {
+func (queue *OperationQueue) IncrementVector(id SiteId, versionNum uint32) {
 	queue.vector.IncrementTo(id, versionNum)
 }
 
 // enqueue an operation and returns list of operation that's ready
-func (queue *VectorQueue) Enqueue(elem QueueElem) []QueueElem {
+func (queue *OperationQueue) Enqueue(elem QueueElem) []QueueElem {
 	if queue.vector.Get(elem.Id) == elem.Version-1 {
 		compare := queue.vector.Compare(elem.Vector)
 		if compare == GREATER_THAN || compare == EQUAL {
@@ -50,7 +51,7 @@ func (queue *VectorQueue) Enqueue(elem QueueElem) []QueueElem {
 	return nil
 }
 
-func dequeHelper(result []QueueElem, queue *VectorQueue, upto int) ([]QueueElem, int) {
+func dequeHelper(result []QueueElem, queue *OperationQueue, upto int) ([]QueueElem, int) {
 	q := queue.queue
 	v := queue.vector
 	offset := 0

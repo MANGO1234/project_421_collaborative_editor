@@ -1,8 +1,18 @@
-package version
+package documentmanager
 
 import (
+	. "../version"
+	"reflect"
+	"runtime/debug"
 	"testing"
 )
+
+func assertEqual(t *testing.T, exp, got interface{}) {
+	if !reflect.DeepEqual(exp, got) {
+		debug.PrintStack()
+		t.Fatalf("Expecting '%v' got '%v'\n", exp, got)
+	}
+}
 
 func NewTestVector(a, b, c uint32) VersionVector {
 	v := NewVector()
