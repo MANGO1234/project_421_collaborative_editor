@@ -158,12 +158,9 @@ func nextNonEmptyAtom(i int, atoms []Atom) int {
 	return i
 }
 
-func immediateEmptyUninitializedAtom(i int, atoms []Atom) int {
+func nextNonEmptyOrUninitializedAtom(i int, atoms []Atom) int {
 	for i = i + 1; i < len(atoms); i++ {
-		if atoms[i].Size != 0 {
-			return len(atoms)
-		}
-		if atoms[i].Size == 0 && atoms[i].State == UNINITIALIZED {
+		if atoms[i].Size != 0 || atoms[i].State == UNINITIALIZED {
 			return i
 		}
 	}
@@ -198,14 +195,14 @@ func findAtomPos(pos int, acc int, atoms []Atom) (int, int) {
 // where we can immediately insert atom if possible
 func findAtomForInsertHelper(pos int, acc int, nodeId NodeId, node *DocNode, atoms []Atom) (byte, int, int) {
 	i := nextNonEmptyAtom(-1, atoms)
-	potentialInsert := EqualNodeId(nodeId, node.NodeId)
+	potentialInsert := EqualSiteId(nodeId, node.NodeId)
 	for i < len(atoms) {
 		if potentialInsert && acc == pos {
-			if atoms[i].State == UNINITIALIZED && i != math.MaxInt16-1 {
+			if canDoInsert(node, i, nodeId) {
 				return INSERT, acc, i
 			} else {
-				k := immediateEmptyUninitializedAtom(i, atoms)
-				if k < len(atoms) && k != math.MaxInt16-1 {
+				k := nextNonEmptyOrUninitializedAtom(i, atoms)
+				if k < len(atoms) && canDoInsert(node, i, nodeId) {
 					return INSERT, acc, k
 				}
 			}
@@ -233,12 +230,20 @@ func insertPosNewHelper(doc *Document, node *DocNode, n int, nodeId NodeId, ch b
 			n = n - 1
 		}
 		node.Atoms = extendAtomToSize(node.Atoms, uint16(n))
-		if EqualNodeId(nodeId, node.NodeId) && n != math.MaxInt16-1 {
-			op := Operation{Type: INSERT, Id: node.NodeId, N: uint16(n), Atom: ch}
-			doc.Insert(op)
-			return op
+		if canDoInsert(node, n, nodeId) {
+			return makeAndApplyInsertOperation(doc, node, n, ch)
 		}
 	}
+}
+
+func canDoInsert(node *DocNode, n int, nodeId NodeId) bool {
+	return node.Atoms[n].Size == 0 && node.Atoms[n].State == UNINITIALIZED && EqualSiteId(nodeId, node.NodeId) && n != math.MaxInt16-1
+}
+
+func makeAndApplyInsertOperation(doc *Document, node *DocNode, n int, ch byte) Operation {
+	op := Operation{Type: INSERT, Id: node.NodeId, N: uint16(n), Atom: ch}
+	doc.Insert(op)
+	return op
 }
 
 func InsertPos(doc *Document, nodeId NodeId, pos int, ch byte) Operation {
@@ -259,18 +264,14 @@ func InsertPos(doc *Document, nodeId NodeId, pos int, ch byte) Operation {
 			currentN = currentN - 1
 		}
 		currentNode.Atoms = extendAtomToSize(currentNode.Atoms, uint16(currentN))
-		if EqualNodeId(nodeId, currentNode.NodeId) && currentN != math.MaxInt16-1 {
-			op := Operation{Type: INSERT, Id: currentNode.NodeId, N: uint16(currentN), Atom: ch}
-			doc.Insert(op)
-			return op
+		if canDoInsert(currentNode, currentN, nodeId) {
+			return makeAndApplyInsertOperation(doc, currentNode, currentN, ch)
 		}
 		return insertPosNewHelper(doc, currentNode, currentN, nodeId, ch)
 	}
 	doInsert, acc, currentN = findAtomForInsertHelper(pos, acc, nodeId, currentNode, currentNode.Atoms)
 	if doInsert == INSERT {
-		op := Operation{Type: INSERT, Id: currentNode.NodeId, N: uint16(currentN), Atom: ch}
-		doc.Insert(op)
-		return op
+		return makeAndApplyInsertOperation(doc, currentNode, currentN, ch)
 	}
 	for {
 		if acc+currentNode.Atoms[currentN].Size-1 == pos && currentNode.Atoms[currentN].State == ALIVE {
@@ -279,9 +280,7 @@ func InsertPos(doc *Document, nodeId NodeId, pos int, ch byte) Operation {
 		acc, currentNode = findNodePos(pos, acc, currentNode.Atoms[currentN].Left)
 		doInsert, acc, currentN = findAtomForInsertHelper(pos, acc, nodeId, currentNode, currentNode.Atoms)
 		if doInsert == INSERT {
-			op := Operation{Type: INSERT, Id: currentNode.NodeId, N: uint16(currentN), Atom: ch}
-			doc.Insert(op)
-			return op
+			return makeAndApplyInsertOperation(doc, currentNode, currentN, ch)
 		}
 	}
 	return Operation{Type: NO_OPERATION}

@@ -233,12 +233,6 @@ func TestBufferOperationReturn(t *testing.T) {
 }
 
 func TestInsertPos(t *testing.T) {
-	d := NewDocument()
-	op := InsertPos(d, A_ID0, 0, 'z')
-	assertEqual(t, "z", DocToString(d))
-	assertEqual(t, op.Type, INSERT_ROOT)
-	assertEqual(t, 1, len(d.Doc))
-
 	for i := 0; i < 9; i++ {
 		d := NewTestDoc()
 		InsertPos(d, A_ID2, i, 'z')
@@ -259,4 +253,51 @@ func TestInsertPos(t *testing.T) {
 			assertEqual(t, 10, d.Size)
 		}
 	}
+}
+
+func TestInsertPosOpReturn(t *testing.T) {
+	d := NewDocument()
+	assertEqual(t, -1, DocHeight(d))
+
+	op := InsertPos(d, A_ID0, 0, 'z')
+	assertEqual(t, "z", DocToString(d))
+	assertEqual(t, INSERT_ROOT, op.Type)
+	assertEqual(t, 1, d.Size)
+	assertEqual(t, 0, DocHeight(d))
+
+	op = InsertPos(d, A_ID1, 1, 'y')
+	assertEqual(t, "zy", DocToString(d))
+	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, 2, d.Size)
+	assertEqual(t, 0, DocHeight(d))
+
+	op = InsertPos(d, A_ID1, 2, 'x')
+	assertEqual(t, "zyx", DocToString(d))
+	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, 3, d.Size)
+	assertEqual(t, 0, DocHeight(d))
+
+	op = InsertPos(d, A_ID1, 2, 'a')
+	assertEqual(t, "zyax", DocToString(d))
+	assertEqual(t, INSERT_NEW, op.Type)
+	assertEqual(t, 4, d.Size)
+	assertEqual(t, 1, DocHeight(d))
+
+	op = InsertPos(d, A_ID2, 3, 'b')
+	assertEqual(t, "zyabx", DocToString(d))
+	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, 5, d.Size)
+	assertEqual(t, 1, DocHeight(d))
+
+	op = InsertPos(d, A_ID2, 0, 'c')
+	assertEqual(t, "czyabx", DocToString(d))
+	assertEqual(t, INSERT_NEW, op.Type)
+	assertEqual(t, 6, d.Size)
+	assertEqual(t, 1, DocHeight(d))
+
+	op = InsertPos(d, A_ID2, 3, 'd')
+	assertEqual(t, "czydabx", DocToString(d))
+	assertEqual(t, INSERT_NEW, op.Type)
+	assertEqual(t, 7, d.Size)
+	assertEqual(t, 2, DocHeight(d))
 }
