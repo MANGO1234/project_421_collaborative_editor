@@ -41,7 +41,6 @@ func startNewSessionOnNetworkManager(nm *NetworkManager) error {
 	}
 	nm.nodePool.handleNewSession(&newSession)
 	go newSession.listenForNewConn()
-	go newSession.periodicallyReconnectDisconnectedNodes()
 	go newSession.periodicallyCheckVersion()
 	nm.id = newSession.id
 	nm.session = &newSession
@@ -49,12 +48,21 @@ func startNewSessionOnNetworkManager(nm *NetworkManager) error {
 }
 
 func (s *session) end() {
+	// TODO: we need to double check this
+	// TODO: this isn't as graceful as it should be. We should wait
+	// until all pending operations and broadcasts are performed
 	close(s.done)
 	s.listener.Close()
 	delta := newQuitNetMeta(s.id, s.manager.addr)
+	// TODO wait for all pending messages to be handled
+	// TODO wait for all pending broadcast operations to complete
 	s.manager.broadcast(newNetMetaUpdateMsg(delta))
-	// TODO disconnect all connected nodes
+	s.disconnectAllConnectedNodes()
 	s.Wait()
+}
+
+func (s *session) disconnectAllConnectedNodes() {
+	// TODO
 }
 
 func (s *session) ended() bool {
@@ -90,13 +98,16 @@ func (s *session) periodicallyReconnectDisconnectedNodes() {
 		if s.ended() {
 			return
 		}
-		reconnectDisconnectedNodes()
+		s.reconnectDisconnectedNodes()
 		time.Sleep(reconnectInterval)
 	}
 }
 
-func reconnectDisconnectedNodes() {
-	// TODO
+func (s *session) reconnectDisconnectedNodes() {
+	nodes := s.manager.nodePool.getDisconnectedNodes()
+	for _, n := range nodes {
+		s.tryPokeOrConnect(n)
+	}
 }
 
 func (s *session) periodicallyCheckVersion() {
@@ -119,7 +130,7 @@ func getLatestVersionVector() []byte {
 }
 
 func (s *session) getLatestVersionCheckMsg() Message {
-	latestMeta := s.manager.nodePool.getLatestNetmetaCopy()
+	latestMeta := s.manager.nodePool.getLatestNetMetaCopy()
 	versionCheckMsgContent := VersionCheckMsgContent{
 		latestMeta,
 		getLatestVersionVector(),

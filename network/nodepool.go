@@ -37,11 +37,28 @@ func (np *nodePool) handleNewSession(s *session) {
 
 // }
 
-//func (np *nodePool) getDisconnectedNodes() []*node {
-//	np.disconnectedPoolMutex.RLock()
-//	nodes :=
-//	np.disconnectedPoolMutex.RUnlock()
-//}
+func (np *nodePool) getDisconnectedNodes() []*node {
+	np.disconnectedPoolMutex.RLock()
+	defer np.disconnectedPoolMutex.RUnlock()
+	return getNodeListFromMap(np.disconnectedPool)
+}
+
+func (np *nodePool) getConnectedNodes() []*node {
+	np.connectedPoolMutex.RLock()
+	defer np.connectedPoolMutex.RUnlock()
+	return getNodeListFromMap(np.connectedPool)
+}
+
+func getNodeListFromMap(nodeMap map[string]*node) []*node {
+	length := len(nodeMap)
+	nodes := make([]*node, length, length)
+	i := 0
+	for _, v := range nodeMap {
+		nodes[i] = v
+		i++
+	}
+	return nodes
+}
 
 // return true if the update results in a change and false otherwise
 func (np *nodePool) applyReceivedUpdate(id string, newNode NodeMeta) bool {
@@ -72,6 +89,8 @@ func (np *nodePool) forceNodeQuit(n *node) {
 
 }
 
+//func (np *nodePool) sendMs
+
 func (np *nodePool) getLatestNetMetaJson() []byte {
 	np.netMetaMutex.RLock()
 	defer np.netMetaMutex.RUnlock()
@@ -85,7 +104,7 @@ func (np *nodePool) getLatestNetMetaJsonPrettyPrint() []byte {
 	return metaJson
 }
 
-func (np *nodePool) getLatestNetmetaCopy() NetMeta {
+func (np *nodePool) getLatestNetMetaCopy() NetMeta {
 	newMeta := newNetMeta()
 	np.netMetaMutex.RLock()
 	for id, node := range np.netMeta {

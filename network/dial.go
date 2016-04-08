@@ -40,11 +40,11 @@ func (nm *NetworkManager) register(remoteAddr string) error {
 	}
 }
 
-func (s *session) tryPokeOrConnect(n *node) error {
+func (s *session) tryPokeOrConnect(n *node) {
 	if shouldPoke(s.manager.addr, n.addr) {
-		return s.poke(n)
+		s.poke(n)
 	} else {
-		return s.connect(n)
+		s.connect(n)
 	}
 }
 
