@@ -20,7 +20,6 @@ const OPTION_CONNECT = "Connect"
 const OPTION_DISCONNECT = "Disconnect"
 const OPTION_NEW_DOCUMENT = "New Document"
 const OPTION_CLOSE_DOCUMENT = "Close Document"
-const OPTION_RETURN_TO_DOCUMENT = "Return To Document"
 
 var appState struct {
 	State       int
@@ -49,8 +48,6 @@ func doAction(input string) {
 			appState.State = STATE_DOCUMENT
 		} else if appState.MenuOptions[n-1] == OPTION_CLOSE_DOCUMENT {
 			appState.DocModel = nil
-		} else if appState.MenuOptions[n-1] == OPTION_RETURN_TO_DOCUMENT {
-			appState.State = STATE_DOCUMENT
 		} else {
 			appState.State = STATE_MENU_RETRY
 		}
@@ -70,7 +67,6 @@ func getPrompt() *buffer.Prompt {
 			options = append(options, OPTION_NEW_DOCUMENT)
 		} else {
 			options = append(options, OPTION_CLOSE_DOCUMENT)
-			options = append(options, OPTION_RETURN_TO_DOCUMENT)
 		}
 		appState.MenuOptions = options
 
@@ -79,10 +75,14 @@ func getPrompt() *buffer.Prompt {
 			str += strconv.Itoa(i+1) + ". " + option + "\n"
 		}
 		str += "\n"
+		if appState.DocModel != nil {
+			str += "Esc to switch between menu and editing the document\n"
+			str += "\n"
+		}
 		if appState.State == STATE_MENU_RETRY {
 			str += "Input is not a valid input, please try again: "
 		} else {
-			str += "Enter number to execture action: "
+			str += "Enter number to exectute option: "
 		}
 		return buffer.NewPrompt(str)
 	}
