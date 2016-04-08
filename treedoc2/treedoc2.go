@@ -2,6 +2,7 @@ package treedoc2
 
 import (
 	"../buffer"
+	"math"
 )
 
 type Document struct {
@@ -200,11 +201,11 @@ func findAtomForInsertHelper(pos int, acc int, nodeId NodeId, node *DocNode, ato
 	potentialInsert := EqualNodeId(nodeId, node.NodeId)
 	for i < len(atoms) {
 		if potentialInsert && acc == pos {
-			if atoms[i].State == UNINITIALIZED {
+			if atoms[i].State == UNINITIALIZED && i != math.MaxInt16-1 {
 				return INSERT, acc, i
 			} else {
 				k := immediateEmptyUninitializedAtom(i, atoms)
-				if k < len(atoms) {
+				if k < len(atoms) && k != math.MaxInt16-1 {
 					return INSERT, acc, k
 				}
 			}
@@ -232,6 +233,11 @@ func insertPosNewHelper(doc *Document, node *DocNode, n int, nodeId NodeId, ch b
 			n = n - 1
 		}
 		node.Atoms = extendAtomToSize(node.Atoms, uint16(n))
+		if EqualNodeId(nodeId, node.NodeId) && n != math.MaxInt16-1 {
+			op := Operation{Type: INSERT, Id: node.NodeId, N: uint16(n), Atom: ch}
+			doc.Insert(op)
+			return op
+		}
 	}
 }
 
@@ -253,6 +259,11 @@ func InsertPos(doc *Document, nodeId NodeId, pos int, ch byte) Operation {
 			currentN = currentN - 1
 		}
 		currentNode.Atoms = extendAtomToSize(currentNode.Atoms, uint16(currentN))
+		if EqualNodeId(nodeId, currentNode.NodeId) && currentN != math.MaxInt16-1 {
+			op := Operation{Type: INSERT, Id: currentNode.NodeId, N: uint16(currentN), Atom: ch}
+			doc.Insert(op)
+			return op
+		}
 		return insertPosNewHelper(doc, currentNode, currentN, nodeId, ch)
 	}
 	doInsert, acc, currentN = findAtomForInsertHelper(pos, acc, nodeId, currentNode, currentNode.Atoms)
