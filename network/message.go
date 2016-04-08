@@ -27,7 +27,7 @@ func newBroadcastMessage(msgType string, content []byte) Message {
 }
 
 func newNetMetaUpdateMsg(delta NetMeta) Message {
-	return newBroadcastMessage(msgTypeNetMetaUpdate, delta.ToJson())
+	return newBroadcastMessage(msgTypeNetMetaUpdate, delta.toJson())
 }
 
 func newNetMetaUpdateMsgFromBytes(delta []byte) Message {

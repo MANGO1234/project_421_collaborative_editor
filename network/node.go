@@ -22,13 +22,13 @@ const (
 
 type node struct {
 	sync.Mutex
-	state     int
-	id        string
-	addr      string
-	conn      net.Conn
-	reader    *util.MessageReader
-	writer    *util.MessageWriter
-	interval  int // current interval to reconnect
+	state    int
+	id       string
+	addr     string
+	conn     net.Conn
+	reader   *util.MessageReader
+	writer   *util.MessageWriter
+	interval int // current interval to reconnect
 }
 
 func newNodeFromAddr(addr string) *node {
@@ -47,4 +47,12 @@ func newNodeFromConn(conn net.Conn) *node {
 	var n node
 	n.setConn(conn)
 	return &n
+}
+
+// pre-condition: nodeMeta.Left == false
+func newNodeFromIdNodeMeta(id string, nodeMeta NodeMeta) *node {
+	n := newNodeFromIdAddr(id, nodeMeta.Addr)
+
+	n.state = nodeStateDisconnected
+	return n
 }

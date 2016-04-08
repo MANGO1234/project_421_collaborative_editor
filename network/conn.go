@@ -18,8 +18,17 @@ func (n *node) resetConn() {
 	n.writer = nil
 }
 
-func (n *node) close() error {
-	return n.conn.Close()
+func (n *node) close()  {
+	if (n.conn != nil) {
+		n.conn.Close()
+		n.resetConn()
+		n.state = nodeStateDisconnected
+	}
+}
+
+func (n *node) leave() {
+	n.close()
+	n.state = nodeStateLeft
 }
 
 // if err occurs, close conn, set state to disconnect
@@ -27,15 +36,15 @@ func (n *node) close() error {
 // error handling
 func (n *node) handleAndReturnError(err error) error {
 	if err != nil {
-		// TODO: test and see if this is working as expected
+		// TODO: test and see if the commented out code is working as expected
 		//       ie. should not make a legitimate node leave
-		if _, ok := err.(net.Error); !ok {
-			// if it's not a network error, we assume the node to be an imposter
-			// and force it to leave the system
-			n.state = nodeStateLeft
-		}
+		//
+		//if _, ok := err.(net.Error); !ok {
+		//	// if it's not a network error, we assume the node to be an imposter
+		//	// and force it to leave the system
+		//	n.state = nodeStateLeft
+		//}
 		n.close()
-		n.resetConn()
 		n.state = nodeStateDisconnected
 	}
 	return err

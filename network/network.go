@@ -23,7 +23,7 @@ type NetworkManager struct {
 }
 
 var (
-	ErrAlreadyConnected = errors.New("network: already connected")
+	ErrAlreadyConnected   = errors.New("network: already connected")
 	ErrAlreadyDisonnected = errors.New("network: already disconnected")
 )
 
