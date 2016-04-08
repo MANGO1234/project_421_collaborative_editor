@@ -76,3 +76,7 @@ func (prompt *Prompt) GetDisplayInformation(width, height int) (int, int, *Line)
 		return sliceLength(line.Bytes), textHeight + inputHeight - 1, sentinel.Next
 	}
 }
+
+func (prompt *Prompt) ToString() string {
+	return string(prompt.input)
+}
