@@ -237,7 +237,7 @@ func insertPosNewHelper(doc *Document, node *DocNode, n int, nodeId NodeId, ch b
 }
 
 func canDoInsert(node *DocNode, n int, nodeId NodeId) bool {
-	return node.Atoms[n].Size == 0 && node.Atoms[n].State == UNINITIALIZED && EqualSiteId(nodeId, node.NodeId) && n != math.MaxInt16-1
+	return node.Atoms[n].Size == 0 && node.Atoms[n].State == UNINITIALIZED && EqualSiteId(nodeId, node.NodeId) && n != math.MaxUint16-1
 }
 
 func makeAndApplyInsertOperation(doc *Document, node *DocNode, n int, ch byte) Operation {

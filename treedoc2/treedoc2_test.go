@@ -2,6 +2,9 @@ package treedoc2
 
 import (
 	"../buffer"
+	"bytes"
+	"fmt"
+	"math"
 	"reflect"
 	"runtime/debug"
 	"testing"
@@ -301,3 +304,35 @@ func TestInsertPosOpReturn(t *testing.T) {
 	assertEqual(t, 7, d.Size)
 	assertEqual(t, 2, DocHeight(d))
 }
+
+// quadratic insert in this case -> will fix if have time
+// temporary reduced to MaxUint8 will work
+//func TestInsertPosMaximumCharacters(t *testing.T) {
+//	d := NewDocument()
+//	op := InsertPos(d, A_ID0, 0, 'z')
+//	assertEqual(t, "z", DocToString(d))
+//	assertEqual(t, INSERT_ROOT, op.Type)
+//	assertEqual(t, 1, d.Size)
+//	assertEqual(t, 0, DocHeight(d))
+//
+//	for i := 1; i < math.MaxUint16-1; i++ {
+//		op := InsertPos(d, A_ID1, i, 'z')
+//		fmt.Println(i)
+//		assertEqual(t, INSERT, op.Type)
+//		assertEqual(t, i+1, d.Size)
+//		assertEqual(t, 0, DocHeight(d))
+//	}
+//
+//	var buf bytes.Buffer
+//	for i := 0; i < math.MaxUint16-1; i++ {
+//		buf.WriteByte('z')
+//	}
+//	assertEqual(t, buf.String(), DocToString(d))
+//
+//	op = InsertPos(d, A_ID1, math.MaxUint16-1, 'z')
+//	buf.WriteByte('z')
+//	assertEqual(t, buf.String(), DocToString(d))
+//	assertEqual(t, INSERT_NEW, op.Type)
+//	assertEqual(t, math.MaxUint16, d.Size)
+//	assertEqual(t, 1, DocHeight(d))
+//}
