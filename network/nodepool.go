@@ -55,11 +55,20 @@ func getNodeListFromMap(nodeMap map[string]*node) []*node {
 	length := len(nodeMap)
 	nodes := make([]*node, length, length)
 	i := 0
-	for _, v := range nodeMap {
-		nodes[i] = v
+	for _, n := range nodeMap {
+		nodes[i] = n
 		i++
 	}
 	return nodes
+}
+
+func (np *nodePool) disconnectAllNodes() {
+	np.poolMutex.RLock()
+	for _, n := range np.pool {
+		// TODO: check locking issues
+		n.close()
+	}
+	np.poolMutex.RUnlock()
 }
 
 func (np *nodePool) removeNodeFromPool(id string) {

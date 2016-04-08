@@ -56,7 +56,7 @@ func (s *session) end() {
 	delta := newQuitNetMeta(s.id, s.manager.addr)
 	// TODO wait for all pending messages to be handled
 	// TODO wait for all pending broadcast operations to complete
-	s.manager.broadcast(newNetMetaUpdateMsg(delta))
+	s.manager.broadcast(newNetMetaUpdateMsg(s.id, delta))
 	s.disconnectAllConnectedNodes()
 	s.Wait()
 }
@@ -132,6 +132,7 @@ func getLatestVersionVector() []byte {
 func (s *session) getLatestVersionCheckMsg() Message {
 	latestMeta := s.manager.nodePool.getLatestNetMetaCopy()
 	versionCheckMsgContent := VersionCheckMsgContent{
+		s.id,
 		latestMeta,
 		getLatestVersionVector(),
 	}

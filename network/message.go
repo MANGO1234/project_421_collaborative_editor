@@ -10,32 +10,36 @@ const (
 	msgTypeTreedocOp     = "treedocOp"    // broadcast
 )
 
+// TODO: for convenience, we are passing json around with possibly
+// layers of mappings. This is inefficient. Should improve on this
+// if we have time
+
 // Message specifies the format of communication between nodes
 // after connection establishes
 type Message struct {
 	Type    string
-	Visited map[string]struct{}
+	Visited VisitedNodes
 	Msg     []byte
 }
 
-func newBroadcastMessage(msgType string, content []byte) Message {
+func newBroadcastMessage(id, msgType string, content []byte) Message {
 	return Message{
 		msgType,
-		make(map[string]struct{}),
+		newVisitedNodesWithSelf(id),
 		content,
 	}
 }
 
-func newNetMetaUpdateMsg(delta NetMeta) Message {
-	return newBroadcastMessage(msgTypeNetMetaUpdate, delta.toJson())
+func newNetMetaUpdateMsg(id string, delta NetMeta) Message {
+	return newBroadcastMessage(id, msgTypeNetMetaUpdate, delta.toJson())
 }
 
-func newNetMetaUpdateMsgFromBytes(delta []byte) Message {
-	return newBroadcastMessage(msgTypeNetMetaUpdate, delta)
+func newNetMetaUpdateMsgFromBytes(id string , delta []byte) Message {
+	return newBroadcastMessage(id, msgTypeNetMetaUpdate, delta)
 }
 
-func newTreedocOpBroadcastMsg(content []byte) Message {
-	return newBroadcastMessage(msgTypeTreedocOp, content)
+func newTreedocOpBroadcastMsg(id string, content []byte) Message {
+	return newBroadcastMessage(id ,msgTypeTreedocOp, content)
 }
 
 func newSyncOrCheckMessage(msgType string, content []byte) Message {
@@ -50,13 +54,8 @@ func newSyncMessage(content []byte) Message {
 	return newSyncOrCheckMessage(msgTypeSync, content)
 }
 
-func newVersionCheckMsg(netMeta NetMeta, content []byte) Message {
-	contentJson := VersionCheckMsgContent{netMeta, content}.toJson()
-	return newSyncOrCheckMessage(msgTypeVersionCheck, contentJson)
-
-}
-
 type VersionCheckMsgContent struct {
+	Source string
 	NetworkMeta   NetMeta
 	VersionVector []byte
 }
@@ -64,4 +63,14 @@ type VersionCheckMsgContent struct {
 func (content VersionCheckMsgContent) toJson() []byte {
 	contentJson, _ := json.Marshal(content)
 	return contentJson
+}
+
+//func newVersionCheckMsg(netMeta NetMeta, content []byte) Message {
+//	msgContent := VersionCheckMsgContent{netMeta, content}
+//	return newSyncOrCheckMessage(msgTypeVersionCheck, msgContent.toJson())
+//}
+
+func (msg *Message) toJson() []byte {
+	msgJson, _ := json.Marshal(msg)
+	return msgJson
 }

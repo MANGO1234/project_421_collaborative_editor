@@ -45,9 +45,19 @@ func (n *node) handleAndReturnError(err error) error {
 		//	n.state = nodeStateLeft
 		//}
 		n.close()
-		n.state = nodeStateDisconnected
 	}
 	return err
+}
+
+// return whether the send succeeded and error if any occurred
+func (n *node) sendMessage(msg Message) bool {
+	msgJson := msg.toJson()
+	n.Lock()
+	defer n.Lock()
+	if n.state == nodeStateConnected {
+		return n.writeMessageSlice(msgJson) == nil
+	}
+	return false
 }
 
 func (n *node) writeMessageSlice(msg []byte) error {

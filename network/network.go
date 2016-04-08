@@ -118,12 +118,22 @@ func (nm *NetworkManager) Reconnect() error {
 
 // Broadcast msg asynchronously
 func (nm *NetworkManager) BroadcastAsync(msg Message) {
-	go func() {
-		nm.broadcastChan <- msg
-	}()
+	if (nm.session != nil) {
+		go func() {
+			nm.broadcastChan <- msg
+		}()
+	}
 }
 
 func (nm *NetworkManager) broadcast(msg Message) {
+	visited := make(map[string]struct{})
+	for _, n := range nm.nodePool.getConnectedNodes() {
+		// TODO
+		success := n.sendMessage(msg)
+		if success != nil {
+			delete(visited, n.id)
+		}
+	}
 
 }
 
