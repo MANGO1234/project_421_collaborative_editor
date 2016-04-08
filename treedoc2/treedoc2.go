@@ -2,7 +2,6 @@ package treedoc2
 
 import (
 	"../buffer"
-	"bytes"
 	"math"
 )
 
@@ -50,48 +49,9 @@ func NewDocument() *Document {
 	return &Document{Doc: make([]*DocNode, 0, 4), Nodes: make(map[NodeId]*DocNode)}
 }
 
-// insert a node in sorted nodeId order into the slice
-func insertNode(disambiguator []*DocNode, node *DocNode) []*DocNode {
-	if disambiguator == nil {
-		a := make([]*DocNode, 1, 4)
-		a[0] = node
-		return a
-	}
-
-	var a = 0
-	for i := len(disambiguator); i >= 1; i-- {
-		docNode := disambiguator[i-1]
-		if bytes.Compare(node.NodeId[:], docNode.NodeId[:]) > 0 {
-			a = i
-			break
-		}
-	}
-
-	disambiguator = append(disambiguator, node)
-	copy(disambiguator[a+1:], disambiguator[a:])
-	disambiguator[a] = node
-	return disambiguator
-}
-
-// just ensure the atom slice has enough elements to prevent out of index error
-func extendAtoms(atoms []Atom, i uint16) []Atom {
-	if atoms == nil {
-		return make([]Atom, i+1, i+5)
-	}
-
-	n := len(atoms)
-	for int(i) >= n {
-		atoms = append(atoms, Atom{})
-		n++
-	}
-	return atoms
-}
-
-func insertAtom(atoms []Atom, atom Atom, i uint16) []Atom {
-	atoms = extendAtoms(atoms, i)
-	atoms[i] = atom
-	return atoms
-}
+// ***************************************************************************************
+// ******************** Operations On Treedoc (Remote operations) ************************
+// ***************************************************************************************
 
 func (doc *Document) ApplyOperation(operation Operation) buffer.BufferOperation {
 	if operation.Type == INSERT_NEW {
@@ -105,48 +65,6 @@ func (doc *Document) ApplyOperation(operation Operation) buffer.BufferOperation 
 	}
 	return buffer.BufferOperation{Type: buffer.NO_OPERATION}
 }
-
-func updateSize(doc *Document, node *DocNode, delta int) {
-	node.Size += delta
-	if node.Parent == nil {
-		doc.Size += delta
-	} else {
-		atom := node.Parent.Atoms[node.ParentN]
-		node.Parent.Atoms[node.ParentN] = Atom{
-			State: atom.State,
-			Atom:  atom.Atom,
-			Size:  atom.Size + delta,
-			Left:  atom.Left,
-		}
-		updateSize(doc, node.Parent, delta)
-	}
-}
-
-func calcPosHelper(doc *Document, node *DocNode, n int) int {
-	acc := 0
-	for i := 0; i < n; i++ {
-		acc += node.Atoms[i].Size
-	}
-	if node.Parent == nil {
-		for _, rootNode := range doc.Doc {
-			if rootNode == node {
-				break
-			}
-			acc += rootNode.Size
-		}
-		return acc
-	}
-	return acc + calcPosHelper(doc, node.Parent, int(node.ParentN))
-}
-
-// calculate the position of the atom given its parent node and its n
-func calcPos(doc *Document, node *DocNode, n int) int {
-	return calcPosHelper(doc, node, n) + node.Atoms[n].Size - 1
-}
-
-// ***************************************************************************************
-// ******************** Operations On Treedoc (Remote operations) ************************
-// ***************************************************************************************
 
 func (doc *Document) InsertNew(operation Operation) buffer.BufferOperation {
 	parent := doc.Nodes[operation.ParentId]
@@ -162,13 +80,13 @@ func (doc *Document) InsertNew(operation Operation) buffer.BufferOperation {
 	}, operation.N)
 	doc.Nodes[operation.Id] = newNode
 
-	parent.Atoms = extendAtoms(parent.Atoms, operation.ParentN)
+	parent.Atoms = extendAtomToSize(parent.Atoms, operation.ParentN)
 	atom := parent.Atoms[operation.ParentN]
 	parent.Atoms[operation.ParentN] = Atom{
 		State: atom.State,
 		Atom:  atom.Atom,
 		Size:  atom.Size,
-		Left:  insertNode(atom.Left, newNode),
+		Left:  insertNodeIntoDisambiguatorsSorted(atom.Left, newNode),
 	}
 	updateSize(doc, newNode, 1)
 	pos := calcPos(doc, newNode, int(operation.N))
@@ -181,9 +99,9 @@ func (doc *Document) InsertRoot(operation Operation) buffer.BufferOperation {
 		NodeId: operation.Id,
 	}
 	doc.Nodes[operation.Id] = newNode
-	newNode.Atoms = extendAtoms(newNode.Atoms, operation.N)
+	newNode.Atoms = extendAtomToSize(newNode.Atoms, operation.N)
 	newNode.Atoms[operation.N] = Atom{Atom: operation.Atom, State: ALIVE, Size: 1}
-	doc.Doc = insertNode(doc.Doc, newNode)
+	doc.Doc = insertNodeIntoDisambiguatorsSorted(doc.Doc, newNode)
 	updateSize(doc, newNode, 1)
 	pos := calcPos(doc, newNode, int(operation.N))
 	return buffer.BufferOperation{Type: buffer.REMOTE_INSERT, Pos: pos, Atom: operation.Atom}
@@ -191,7 +109,7 @@ func (doc *Document) InsertRoot(operation Operation) buffer.BufferOperation {
 
 func (doc *Document) Insert(operation Operation) buffer.BufferOperation {
 	node := doc.Nodes[operation.Id]
-	node.Atoms = extendAtoms(node.Atoms, operation.N)
+	node.Atoms = extendAtomToSize(node.Atoms, operation.N)
 	atom := node.Atoms[operation.N]
 	if atom.State != UNINITIALIZED {
 		panic("Atom is not uninitialized \"" + DocToString(doc) + "\" ")
@@ -204,7 +122,7 @@ func (doc *Document) Insert(operation Operation) buffer.BufferOperation {
 
 func (doc *Document) Delete(operation Operation) buffer.BufferOperation {
 	node := doc.Nodes[operation.Id]
-	node.Atoms = extendAtoms(node.Atoms, operation.N)
+	node.Atoms = extendAtomToSize(node.Atoms, operation.N)
 	atom := node.Atoms[operation.N]
 	if atom.State == UNINITIALIZED {
 		panic("Atom is not alive \"" + DocToString(doc) + "\" ")
@@ -304,7 +222,7 @@ func insertPosNewHelper(doc *Document, node *DocNode, n int, nodeId NodeId, ch b
 		if node.Atoms[n-1].State == UNINITIALIZED {
 			n = n - 1
 		}
-		node.Atoms = extendAtoms(node.Atoms, uint16(n))
+		node.Atoms = extendAtomToSize(node.Atoms, uint16(n))
 	}
 }
 
@@ -324,7 +242,7 @@ func InsertPos(doc *Document, nodeId NodeId, pos int, ch byte) Operation {
 		if currentNode.Atoms[currentN-1].State == UNINITIALIZED {
 			currentN = currentN - 1
 		}
-		currentNode.Atoms = extendAtoms(currentNode.Atoms, uint16(currentN))
+		currentNode.Atoms = extendAtomToSize(currentNode.Atoms, uint16(currentN))
 		return insertPosNewHelper(doc, currentNode, currentN, nodeId, ch)
 	}
 	acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
