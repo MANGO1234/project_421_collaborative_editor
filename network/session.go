@@ -91,35 +91,35 @@ func (s *session) listenForNewConn() {
 	}
 }
 
-func (s *session) periodicallyReconnectDisconnectedNodes() {
-	s.Add(1)
-	defer s.Done()
-	for {
-		if s.ended() {
-			return
-		}
-		s.reconnectDisconnectedNodes()
-		time.Sleep(reconnectInterval)
-	}
-}
-
-func (s *session) reconnectDisconnectedNodes() {
-	nodes := s.manager.nodePool.getDisconnectedNodes()
-	for _, n := range nodes {
-		s.tryPokeOrConnect(n)
-	}
-}
+//func (s *session) periodicallyReconnectDisconnectedNodes() {
+//	s.Add(1)
+//	defer s.Done()
+//	for {
+//		if s.ended() {
+//			return
+//		}
+//		s.reconnectDisconnectedNodes()
+//		time.Sleep(reconnectInterval)
+//	}
+//}
+//
+//func (s *session) reconnectDisconnectedNodes() {
+//	nodes := s.manager.nodePool.getDisconnectedNodes()
+//	for _, n := range nodes {
+//		s.tryPokeOrConnect(n)
+//	}
+//}
 
 func (s *session) periodicallyCheckVersion() {
 	s.Add(1)
 	defer s.Done()
 	for {
+		time.Sleep(versionCheckInterval)
 		if s.ended() {
 			return
 		}
 		msg := s.getLatestVersionCheckMsg()
 		s.manager.broadcast(msg)
-		time.Sleep(versionCheckInterval)
 	}
 }
 

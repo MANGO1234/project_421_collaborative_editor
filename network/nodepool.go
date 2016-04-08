@@ -6,19 +6,19 @@ import (
 )
 
 type nodePool struct {
-	netMetaMutex          sync.RWMutex
-	netMeta               NetMeta
-	connectedPoolMutex    sync.RWMutex
-	connectedPool         map[string]*node
-	disconnectedPoolMutex sync.RWMutex
-	disconnectedPool      map[string]*node
+	netMetaMutex       sync.RWMutex
+	netMeta            NetMeta
+	connectedPoolMutex sync.RWMutex
+	connectedPool      map[string]*node
+	indexMutex         sync.RWMutex
+	index              map[string]*node
 }
 
 func newNodePool() *nodePool {
 	var np nodePool
 	np.netMeta = newNetMeta()
 	np.connectedPool = make(map[string]*node)
-	np.disconnectedPool = make(map[string]*node)
+	np.index = make(map[string]*node)
 	return &np
 }
 
@@ -36,12 +36,6 @@ func (np *nodePool) handleNewSession(s *session) {
 // func (np *nodepool) handleEndSession(s *session) {
 
 // }
-
-func (np *nodePool) getDisconnectedNodes() []*node {
-	np.disconnectedPoolMutex.RLock()
-	defer np.disconnectedPoolMutex.RUnlock()
-	return getNodeListFromMap(np.disconnectedPool)
-}
 
 func (np *nodePool) getConnectedNodes() []*node {
 	np.connectedPoolMutex.RLock()
@@ -63,7 +57,10 @@ func getNodeListFromMap(nodeMap map[string]*node) []*node {
 // return true if the update results in a change and false otherwise
 func (np *nodePool) applyReceivedUpdate(id string, newNode NodeMeta) bool {
 	// TODO
-	if node, ok := np.netMeta[id]; !ok || (!node.Left && newNode.Left) {
+	if node, ok := np.netMeta[id]; !ok {
+		np.netMeta[id] = newNode
+		return true
+	} else if (!node.Left && newNode.Left) {
 		np.netMeta[id] = newNode
 		return true
 	}

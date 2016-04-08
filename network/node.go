@@ -28,7 +28,6 @@ type node struct {
 	conn      net.Conn
 	reader    *util.MessageReader
 	writer    *util.MessageWriter
-	countdown int // reconnect if this is 0 and node is disconnected
 	interval  int // current interval to reconnect
 }
 

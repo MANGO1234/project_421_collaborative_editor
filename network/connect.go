@@ -56,7 +56,9 @@ func (s *session) foreverRead(n *node) {
 	defer s.Done()
 	for {
 		rawMsg, err := n.readMessageSlice()
-
+		if s.ended() {
+			return
+		}
 		if err != nil {
 			// TODO reconnect the node; move to disconnected pool
 			return

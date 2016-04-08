@@ -22,6 +22,11 @@ type NetworkManager struct {
 	session       *session
 }
 
+var (
+	ErrAlreadyConnected = errors.New("network: already connected")
+	ErrAlreadyDisonnected = errors.New("network: already disconnected")
+)
+
 // NewNetworkManager initiate a new NetworkManager with listening
 // address addr to handle network operations
 func NewNetworkManager(addr string) (*NetworkManager, error) {
@@ -96,7 +101,7 @@ func (nm *NetworkManager) ConnectTo(remoteAddr string) error {
 // Disconnect disconnects from the rest of the network voluntarily
 func (nm *NetworkManager) Disconnect() error {
 	if nm.session == nil {
-		return errors.New("Already disconnected")
+		return ErrAlreadyDisonnected
 	}
 	nm.session.end()
 	nm.session = nil
@@ -106,7 +111,7 @@ func (nm *NetworkManager) Disconnect() error {
 // Reconnect rejoins the network with new UUID.
 func (nm *NetworkManager) Reconnect() error {
 	if nm.session != nil {
-		return errors.New("The node is already connected!")
+		return ErrAlreadyConnected
 	}
 	return startNewSessionOnNetworkManager(nm)
 }
@@ -119,7 +124,7 @@ func (nm *NetworkManager) BroadcastAsync(msg Message) {
 }
 
 func (nm *NetworkManager) broadcast(msg Message) {
-	// TODO
+
 }
 
 func (nm *NetworkManager) GetNetworkMetadata() string {
