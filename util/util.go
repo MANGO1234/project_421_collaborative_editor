@@ -16,10 +16,18 @@ func Debug(v ...interface{}) {
 	}
 }
 
+// TODO: implement a pretty print function
+
 func CheckError(err error) {
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error ", err.Error())
 		os.Exit(-1)
+	}
+}
+
+func PrintError(err error) {
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error ", err.Error())
 	}
 }
 
@@ -138,4 +146,43 @@ func (writer *MessageWriter) WriteMessageSlice(str []byte) error {
 		return err
 	}
 	return err
+}
+
+// write a message type to a writer, followed by str as message content
+func (writer *MessageWriter) WriteMessage2(msgType string, msg []byte) error {
+	// write message type
+	_, err := writer.Writer.WriteString(msgType)
+	if err != nil {
+		return err
+	}
+	err = writer.Writer.WriteByte(' ')
+	if err != nil {
+		return err
+	}
+
+	// write str
+	err = writer.WriteMessageSlice(msg)
+	return err
+}
+
+// read a message, return msgType as string and message content as []byte.
+func (reader *MessageReader) ReadMessage2() (string, []byte, error) {
+	msgType, err := reader.Reader.ReadString(' ')
+	n := len(msgType)
+	if n > 0 {
+		n -= 1
+	} else {
+		n = 0
+	}
+	if err != nil {
+		return "", nil, err
+	}
+
+	buff, err := reader.ReadMessageSlice()
+	if err != nil {
+		return msgType[:n], nil, err
+	} else {
+		return msgType[:n], buff, err
+	}
+
 }

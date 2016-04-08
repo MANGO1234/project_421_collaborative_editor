@@ -9,18 +9,39 @@ const LEFT = false
 const RIGHT = true
 
 const ALIVE = byte(0)
-const DEAD = byte(1)
+const DEAD = byte(1) //used to mark a DocNode as deleted
 const UNINITIALIZED = byte(2)
 
+// Unique id for each node
 type SiteId []byte
 
+// Represents the direction to go
 type Dir struct {
 	Id  SiteId
 	Dir bool
 }
 
+// The path to an atom in Treedoc
 type PosId []Dir
 
+// ==========================================================
+// The treedoc structure:
+//              ___________________
+//             | DisambiguatorNode |
+//             | O   O  ...      O |
+//             |___________________|
+//               |   |           |
+//        _______|   |_______    |_______
+//       |DocNode|   |DocNode|...|DocNode|   <- DocNodes
+//       |_L___R_|   |_L___R_|   |_L___R_|
+//         |   |       |   |  ...  |   |
+//      (ooo) (ooo) (ooo) (ooo) (ooo) (ooo)  <- DisambiguatorNodes 
+//      /|  ...                          |\      
+// 
+// ===========================================================
+
+// This is used to deal with concurrent edit to the same location
+// Can be the root of a treedoc
 type DisambiguatorNode struct {
 	Nodes []*DocNode
 }
@@ -52,7 +73,7 @@ func insertNode(disambiguator *DisambiguatorNode, docNode *DocNode) {
 	for i = 0; i < len(disambiguator.Nodes); i++ {
 		node := disambiguator.Nodes[i]
 		result := bytes.Compare(node.SiteId, docNode.SiteId)
-		if result > 0 {
+		if result > 0 { // node.SiteId > docNode.SiteId
 			break
 		} else if result == 0 {
 			if node.State == UNINITIALIZED {
@@ -125,6 +146,7 @@ func Merge(disambiguator1 *DisambiguatorNode, disambiguator2 *DisambiguatorNode)
 		if nodeFound == nil {
 			insertNode(disambiguator1, node)
 		} else {
+			// Performance: Could maybe reuse nodes instead of copying out
 			if nodeFound.Left == nil && node.Left != nil {
 				nodeFound.Left = NewDisambiguatorNode()
 			}
@@ -137,6 +159,7 @@ func Merge(disambiguator1 *DisambiguatorNode, disambiguator2 *DisambiguatorNode)
 	}
 }
 
+// generate a new treedoc with str at posId 
 func GenerateDoc(posId PosId, str string) *DisambiguatorNode {
 	root := NewDisambiguatorNode()
 	length := len(posId)
@@ -149,6 +172,7 @@ func GenerateDoc(posId PosId, str string) *DisambiguatorNode {
 	return root
 }
 
+// break down a string into a treedoc produced in siteId
 func generateDocHelper(siteId SiteId, str string, a, b int) *DocNode {
 	if a >= b {
 		return nil
@@ -169,6 +193,8 @@ func generateDocHelper(siteId SiteId, str string, a, b int) *DocNode {
 }
 
 // debugging, printing etc.
+
+// debug printing of treedoc (starting at disambiguator) in infix order.
 func DebugDoc(disambiguator *DisambiguatorNode) {
 	if disambiguator == nil {
 		return
@@ -193,6 +219,8 @@ func DebugDoc(disambiguator *DisambiguatorNode) {
 	}
 }
 
+
+// return a list of DocNode in treedoc (starting at disambiguator) in infix order
 func DocToNodes(disambiguator *DisambiguatorNode) []*DocNode {
 	return DocToNodesHelper(disambiguator, make([]*DocNode, 0, 10))
 }
@@ -209,6 +237,8 @@ func DocToNodesHelper(disambiguator *DisambiguatorNode, slice []*DocNode) []*Doc
 	return slice
 }
 
+// return a buffer of the current contents represented by the treedoc 
+// (starting at disambiguator)
 func DocToBuffer(disambiguator *DisambiguatorNode) *bytes.Buffer {
 	var buf bytes.Buffer
 	return DocToBufferHelper(disambiguator, &buf)
