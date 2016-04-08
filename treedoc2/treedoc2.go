@@ -5,6 +5,8 @@ import (
 	"math"
 )
 
+const MAX_ATOMS_PER_NODE = math.MaxUint16
+
 type Document struct {
 	Size  int
 	Doc   []*DocNode
@@ -202,7 +204,7 @@ func findAtomForInsertHelper(pos int, acc int, nodeId NodeId, node *DocNode, ato
 				return INSERT, acc, i
 			} else {
 				k := nextNonEmptyOrUninitializedAtom(i, atoms)
-				if k < len(atoms) && canDoInsert(node, i, nodeId) {
+				if k < len(atoms) && canDoInsert(node, k, nodeId) {
 					return INSERT, acc, k
 				}
 			}
@@ -237,7 +239,7 @@ func insertPosNewHelper(doc *Document, node *DocNode, n int, nodeId NodeId, ch b
 }
 
 func canDoInsert(node *DocNode, n int, nodeId NodeId) bool {
-	return node.Atoms[n].Size == 0 && node.Atoms[n].State == UNINITIALIZED && EqualSiteId(nodeId, node.NodeId) && n != math.MaxUint16-1
+	return node.Atoms[n].Size == 0 && node.Atoms[n].State == UNINITIALIZED && EqualSiteId(nodeId, node.NodeId) && n != MAX_ATOMS_PER_NODE
 }
 
 func makeAndApplyInsertOperation(doc *Document, node *DocNode, n int, ch byte) Operation {

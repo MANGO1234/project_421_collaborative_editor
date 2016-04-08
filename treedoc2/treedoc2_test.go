@@ -3,8 +3,6 @@ package treedoc2
 import (
 	"../buffer"
 	"bytes"
-	"fmt"
-	"math"
 	"reflect"
 	"runtime/debug"
 	"testing"
@@ -306,7 +304,7 @@ func TestInsertPosOpReturn(t *testing.T) {
 }
 
 // quadratic insert in this case -> will fix if have time
-// temporary reduced to MaxUint8 will work
+// temporary reduce MAX_ATOMS_PER_NODE to MaxUint8 will work
 //func TestInsertPosMaximumCharacters(t *testing.T) {
 //	d := NewDocument()
 //	op := InsertPos(d, A_ID0, 0, 'z')
@@ -315,24 +313,23 @@ func TestInsertPosOpReturn(t *testing.T) {
 //	assertEqual(t, 1, d.Size)
 //	assertEqual(t, 0, DocHeight(d))
 //
-//	for i := 1; i < math.MaxUint16-1; i++ {
+//	for i := 1; i < MAX_ATOMS_PER_NODE; i++ {
 //		op := InsertPos(d, A_ID1, i, 'z')
-//		fmt.Println(i)
 //		assertEqual(t, INSERT, op.Type)
 //		assertEqual(t, i+1, d.Size)
 //		assertEqual(t, 0, DocHeight(d))
 //	}
 //
 //	var buf bytes.Buffer
-//	for i := 0; i < math.MaxUint16-1; i++ {
+//	for i := 0; i < MAX_ATOMS_PER_NODE; i++ {
 //		buf.WriteByte('z')
 //	}
 //	assertEqual(t, buf.String(), DocToString(d))
 //
-//	op = InsertPos(d, A_ID1, math.MaxUint16-1, 'z')
+//	op = InsertPos(d, A_ID1, MAX_ATOMS_PER_NODE, 'z')
 //	buf.WriteByte('z')
 //	assertEqual(t, buf.String(), DocToString(d))
 //	assertEqual(t, INSERT_NEW, op.Type)
-//	assertEqual(t, math.MaxUint16, d.Size)
+//	assertEqual(t, MAX_ATOMS_PER_NODE+1, d.Size)
 //	assertEqual(t, 1, DocHeight(d))
 //}
