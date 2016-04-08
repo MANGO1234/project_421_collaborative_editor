@@ -1,6 +1,7 @@
 package treedoc2
 
 import (
+	"../buffer"
 	"reflect"
 	"runtime/debug"
 	"testing"
@@ -198,36 +199,36 @@ func TestDeletePos(t *testing.T) {
 func TestBufferOperationReturn(t *testing.T) {
 	d := NewTestDoc()
 	op := d.ApplyOperation(Operation{Type: DELETE, Id: C_ID1, N: 1})
-	assertEqual(t, DELETE, op.Type)
+	assertEqual(t, buffer.DELETE, op.Type)
 	assertEqual(t, 5, op.Pos)
 	op = d.ApplyOperation(Operation{Type: DELETE, Id: C_ID0, N: 0})
-	assertEqual(t, DELETE, op.Type)
+	assertEqual(t, buffer.DELETE, op.Type)
 	assertEqual(t, 0, op.Pos)
 
 	d = NewDocument()
 	op = d.ApplyOperation(Operation{Type: INSERT_ROOT, Atom: 'a', Id: A_ID0, N: 0})
-	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, buffer.REMOTE_INSERT, op.Type)
 	assertEqual(t, 0, op.Pos)
 	op = d.ApplyOperation(Operation{Type: INSERT_ROOT, Atom: 'b', Id: B_ID0, N: 0})
-	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, buffer.REMOTE_INSERT, op.Type)
 	assertEqual(t, 1, op.Pos)
 	op = d.ApplyOperation(Operation{Type: INSERT_NEW, Atom: 'c', ParentId: A_ID0, ParentN: 0, Id: C_ID0, N: 0})
-	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, buffer.REMOTE_INSERT, op.Type)
 	assertEqual(t, 0, op.Pos)
 	op = d.ApplyOperation(Operation{Type: INSERT_NEW, Atom: 'd', ParentId: A_ID0, ParentN: 1, Id: C_ID1, N: 0})
-	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, buffer.REMOTE_INSERT, op.Type)
 	assertEqual(t, 2, op.Pos)
 	op = d.ApplyOperation(Operation{Type: INSERT_NEW, Atom: 'e', ParentId: C_ID1, ParentN: 1, Id: D_ID0, N: 0})
-	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, buffer.REMOTE_INSERT, op.Type)
 	assertEqual(t, 3, op.Pos)
 	op = d.ApplyOperation(Operation{Type: INSERT, Atom: 'f', Id: C_ID0, N: 1})
-	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, buffer.REMOTE_INSERT, op.Type)
 	assertEqual(t, 1, op.Pos)
 	op = d.ApplyOperation(Operation{Type: INSERT, Atom: 'g', Id: C_ID1, N: 1})
-	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, buffer.REMOTE_INSERT, op.Type)
 	assertEqual(t, 5, op.Pos)
 	op = d.ApplyOperation(Operation{Type: INSERT, Atom: 'h', Id: C_ID1, N: 2})
-	assertEqual(t, INSERT, op.Type)
+	assertEqual(t, buffer.REMOTE_INSERT, op.Type)
 	assertEqual(t, 6, op.Pos)
 }
 

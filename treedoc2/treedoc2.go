@@ -2,7 +2,6 @@ package treedoc2
 
 import (
 	"../buffer"
-	"math"
 )
 
 type Document struct {
@@ -158,17 +157,14 @@ func nextNonEmptyAtom(i int, atoms []Atom) int {
 	return i
 }
 
-func immediateNextEmptyUninitializedNode(i int, atoms []Atom) int {
+func immediateEmptyUninitializedAtom(i int, atoms []Atom) int {
 	for i = i + 1; i < len(atoms); i++ {
-		if atoms[i].Size != 0 || atoms[i].State == ALIVE {
-			return -1
+		if atoms[i].Size != 0 {
+			return len(atoms)
 		}
-		if atoms[i].State == UNINITIALIZED {
+		if atoms[i].Size == 0 && atoms[i].State == UNINITIALIZED {
 			return i
 		}
-	}
-	if i >= math.MaxInt16-1 {
-		return -1
 	}
 	return i
 }
@@ -197,16 +193,29 @@ func findAtomPos(pos int, acc int, atoms []Atom) (int, int) {
 	return acc, i
 }
 
-// traverse the tree until it finds the ALIVE atom at pos
-func posToIdForDel(nodes []*DocNode, pos int) (*DocNode, int) {
-	var currentN int
-	acc, currentNode := findNodePos(pos, 0, nodes)
-	acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
-	for !(acc+currentNode.Atoms[currentN].Size-1 == pos && currentNode.Atoms[currentN].State == ALIVE) {
-		acc, currentNode = findNodePos(pos, acc, currentNode.Atoms[currentN].Left)
-		acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
+// finds the next node to keep traverse down the tree to find pos, OR find the node and atom
+// where we can immediately insert atom if possible
+func findAtomForInsertHelper(pos int, acc int, nodeId NodeId, node *DocNode, atoms []Atom) (byte, int, int) {
+	i := nextNonEmptyAtom(-1, atoms)
+	potentialInsert := EqualNodeId(nodeId, node.NodeId)
+	for i < len(atoms) {
+		if potentialInsert && acc == pos {
+			if atoms[i].State == UNINITIALIZED {
+				return INSERT, acc, i
+			} else {
+				k := immediateEmptyUninitializedAtom(i, atoms)
+				if k < len(atoms) {
+					return INSERT, acc, k
+				}
+			}
+		}
+		if acc+atoms[i].Size > pos {
+			return NO_OPERATION, acc, i
+		}
+		acc += atoms[i].Size
+		i = nextNonEmptyAtom(i, atoms)
 	}
-	return currentNode, currentN
+	return NO_OPERATION, acc, i
 }
 
 // traverse the tree until it finds a place to insert (either a new node or reuse an applicable node)
@@ -234,6 +243,7 @@ func InsertPos(doc *Document, nodeId NodeId, pos int, ch byte) Operation {
 	}
 
 	var currentN int
+	var doInsert byte
 	acc, currentNode := findNodePos(pos, 0, doc.Doc)
 	// check for end of the document
 	if currentNode == nil {
@@ -245,22 +255,37 @@ func InsertPos(doc *Document, nodeId NodeId, pos int, ch byte) Operation {
 		currentNode.Atoms = extendAtomToSize(currentNode.Atoms, uint16(currentN))
 		return insertPosNewHelper(doc, currentNode, currentN, nodeId, ch)
 	}
-	acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
+	doInsert, acc, currentN = findAtomForInsertHelper(pos, acc, nodeId, currentNode, currentNode.Atoms)
+	if doInsert == INSERT {
+		op := Operation{Type: INSERT, Id: currentNode.NodeId, N: uint16(currentN), Atom: ch}
+		doc.Insert(op)
+		return op
+	}
 	for {
-		//		if acc+currentNode.Atoms[currentN].Size-1 == pos {
-		//			if equalId(currentNode.NodeId, nodeId) && currentNode.Atoms[currentN].State == UNINITIALIZED {
-		//				op := Operation{Type: INSERT, Id: currentNode.NodeId, N: uint16(currentN), Atom: ch}
-		//				Insert(doc, op)
-		//				return op
-		//			}
-		//		}
 		if acc+currentNode.Atoms[currentN].Size-1 == pos && currentNode.Atoms[currentN].State == ALIVE {
 			return insertPosNewHelper(doc, currentNode, currentN, nodeId, ch)
 		}
 		acc, currentNode = findNodePos(pos, acc, currentNode.Atoms[currentN].Left)
-		acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
+		doInsert, acc, currentN = findAtomForInsertHelper(pos, acc, nodeId, currentNode, currentNode.Atoms)
+		if doInsert == INSERT {
+			op := Operation{Type: INSERT, Id: currentNode.NodeId, N: uint16(currentN), Atom: ch}
+			doc.Insert(op)
+			return op
+		}
 	}
 	return Operation{Type: NO_OPERATION}
+}
+
+// traverse the tree until it finds the ALIVE atom at pos
+func posToIdForDel(nodes []*DocNode, pos int) (*DocNode, int) {
+	var currentN int
+	acc, currentNode := findNodePos(pos, 0, nodes)
+	acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
+	for !(acc+currentNode.Atoms[currentN].Size-1 == pos && currentNode.Atoms[currentN].State == ALIVE) {
+		acc, currentNode = findNodePos(pos, acc, currentNode.Atoms[currentN].Left)
+		acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
+	}
+	return currentNode, currentN
 }
 
 func DeletePos(doc *Document, pos int) Operation {
