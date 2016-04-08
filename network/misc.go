@@ -20,7 +20,7 @@ func newVisitedNodesWithSelf(id string) VisitedNodes {
 	return v
 }
 
-func copyVisitedNodes(v VisitedNodes) VisitedNodes {
+func (v VisitedNodes) copyVisitedNodes() VisitedNodes {
 	vCopy := newVisitedNodes()
 	for id, _ := range v {
 		vCopy[id] = struct{}{}
@@ -28,8 +28,19 @@ func copyVisitedNodes(v VisitedNodes) VisitedNodes {
 	return vCopy
 }
 
-func (v VisitedNodes) merge(v2 VisitedNodes ) {
-	for id, _:=range v2 {
+func (v VisitedNodes) addAll(v2 VisitedNodes) {
+	for id, _ := range v2 {
 		v[id] = struct{}{}
 	}
+}
+
+func (v VisitedNodes) addAllFromNodeList(nodeList []*node) {
+	for _, n := range nodeList {
+		v[n.id] = struct{}{}
+	}
+}
+
+func (v VisitedNodes) has(id string) bool {
+	_, ok := v[id]
+	return ok
 }

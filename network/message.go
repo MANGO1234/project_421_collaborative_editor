@@ -34,12 +34,12 @@ func newNetMetaUpdateMsg(id string, delta NetMeta) Message {
 	return newBroadcastMessage(id, msgTypeNetMetaUpdate, delta.toJson())
 }
 
-func newNetMetaUpdateMsgFromBytes(id string , delta []byte) Message {
+func newNetMetaUpdateMsgFromBytes(id string, delta []byte) Message {
 	return newBroadcastMessage(id, msgTypeNetMetaUpdate, delta)
 }
 
 func newTreedocOpBroadcastMsg(id string, content []byte) Message {
-	return newBroadcastMessage(id ,msgTypeTreedocOp, content)
+	return newBroadcastMessage(id, msgTypeTreedocOp, content)
 }
 
 func newSyncOrCheckMessage(msgType string, content []byte) Message {
@@ -55,7 +55,7 @@ func newSyncMessage(content []byte) Message {
 }
 
 type VersionCheckMsgContent struct {
-	Source string
+	Source        string
 	NetworkMeta   NetMeta
 	VersionVector []byte
 }

@@ -17,18 +17,20 @@ const (
 	nodeStateUninitialized = iota
 	nodeStateConnected
 	nodeStateDisconnected
+	reconnecting
 	nodeStateLeft
 )
 
 type node struct {
-	sync.Mutex
-	state    int
-	id       string
-	addr     string
-	conn     net.Conn
-	reader   *util.MessageReader
-	writer   *util.MessageWriter
-	interval int // current interval to reconnect
+	stateMutex sync.Mutex
+	writeMutex sync.Mutex
+	state      int
+	id         string
+	addr       string
+	conn       net.Conn
+	reader     *util.MessageReader
+	writer     *util.MessageWriter
+	interval   int // current interval to reconnect
 }
 
 func newNodeFromAddr(addr string) *node {
@@ -55,4 +57,28 @@ func newNodeFromIdNodeMeta(id string, nodeMeta NodeMeta) *node {
 
 	n.state = nodeStateDisconnected
 	return n
+}
+
+func (n *node) leave() {
+	// TODO: figure out locking
+	n.close()
+	n.state = nodeStateLeft
+}
+
+// if err occurs, close conn, set state to disconnect
+// return error so the caller can decide whether to do any other
+// error handling
+func (n *node) handleAndReturnError(err error) error {
+	if err != nil {
+		// TODO: test and see if the commented out code is working as expected
+		//       ie. should not make a legitimate node leave
+		//
+		//if _, ok := err.(net.Error); !ok {
+		//	// if it's not a network error, we assume the node to be an imposter
+		//	// and force it to leave the system
+		//	n.state = nodeStateLeft
+		//}
+		n.close()
+	}
+	return err
 }

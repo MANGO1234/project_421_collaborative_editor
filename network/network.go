@@ -78,7 +78,7 @@ func (nm *NetworkManager) handleIncomingNetMeta(incoming []byte) error {
 
 func (nm *NetworkManager) serveBroadcastRequests() {
 	for msg := range nm.broadcastChan {
-		nm.broadcast(msg)
+		nm.session.broadcast(msg)
 	}
 }
 
@@ -118,23 +118,15 @@ func (nm *NetworkManager) Reconnect() error {
 
 // Broadcast msg asynchronously
 func (nm *NetworkManager) BroadcastAsync(msg Message) {
-	if (nm.session != nil) {
+	if nm.session != nil {
 		go func() {
 			nm.broadcastChan <- msg
 		}()
 	}
 }
 
-func (nm *NetworkManager) broadcast(msg Message) {
-	visited := make(map[string]struct{})
-	for _, n := range nm.nodePool.getConnectedNodes() {
-		// TODO
-		success := n.sendMessage(msg)
-		if success != nil {
-			delete(visited, n.id)
-		}
-	}
-
+func (nm *NetworkManager) sendMsgTo(msg Message, id string) {
+	// TODO
 }
 
 func (nm *NetworkManager) GetNetworkMetadata() string {

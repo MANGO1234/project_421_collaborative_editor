@@ -56,7 +56,7 @@ func (s *session) end() {
 	delta := newQuitNetMeta(s.id, s.manager.addr)
 	// TODO wait for all pending messages to be handled
 	// TODO wait for all pending broadcast operations to complete
-	s.manager.broadcast(newNetMetaUpdateMsg(s.id, delta))
+	s.broadcast(newNetMetaUpdateMsg(s.id, delta))
 	s.disconnectAllConnectedNodes()
 	s.Wait()
 }
@@ -110,6 +110,47 @@ func (s *session) listenForNewConn() {
 //	}
 //}
 
+func (s *session) broadcast(msg Message) {
+	connected := s.manager.nodePool.getConnectedNodes()
+	original := msg.Visited.copyVisitedNodes()
+	msg.Visited.addAllFromNodeList(connected)
+	for _, n := range connected {
+		if !original.has(n.id) {
+			succeeded := s.sendMessageToNode(msg, n)
+			if !succeeded {
+				delete(msg.Visited, n.id)
+				// TODO initialize reconnect
+			}
+		}
+	}
+}
+
+func (s *session) sendMessageToNode(msg Message, n *node) bool {
+	msgJson := msg.toJson()
+	n.stateMutex.Lock()
+	defer n.stateMutex.Unlock()
+	n.writeMutex.Lock()
+	defer n.writeMutex.Unlock()
+	if n.state == nodeStateConnected {
+		err := n.writeMessageSlice(msgJson)
+		if err != nil {
+			n.close() // the reading thread handles reconnect
+			return false
+		}
+		return true
+	}
+	return false
+}
+
+//func (s *session) reconnectNode(n *node) {
+//	n.stateMutex.Lock()
+//	if n.state == reconnecting
+//}
+
+func (s *session) periodicallyReconnectNode(n *node) {
+
+}
+
 func (s *session) periodicallyCheckVersion() {
 	s.Add(1)
 	defer s.Done()
@@ -119,7 +160,7 @@ func (s *session) periodicallyCheckVersion() {
 			return
 		}
 		msg := s.getLatestVersionCheckMsg()
-		s.manager.broadcast(msg)
+		s.broadcast(msg)
 	}
 }
 
