@@ -49,13 +49,14 @@ func (nm *NetworkManager) serveIncomingMessages() {
 	for msg := range nm.msgChan {
 		switch msg.Type {
 		case msgTypeNetMetaUpdate:
-			nm.handleIncomingNetMeta(msg.Msg)
+			nm.handleIncomingNetMeta(msg)
 		case msgTypeTreedocOp:
-		// TODO
+			nm.handleIncomingTreedocOp(msg)
 		case msgTypeVersionCheck:
-		// TODO
+			nm.handleIncomingVersionCheck(msg)
 		case msgTypeSync:
-		// TODO
+			// TODO: give this to treedoc manager
+			stubApplySyncInfo(msg.Msg)
 		default:
 			// ignore and do nothing
 		}
@@ -66,14 +67,56 @@ func TODO(sth interface{}) {
 
 }
 
-func (nm *NetworkManager) handleIncomingNetMeta(incoming []byte) error {
-	incomingNetMeta, err := newNetMetaFromJson(incoming)
+func (nm *NetworkManager) handleIncomingNetMeta(msg Message) {
+	updates, err := newNetMetaFromJson(msg.Msg)
 	if err != nil {
-		return err
+		return
 	}
-	TODO(incomingNetMeta)
-	return nil
-	// TODO handle it
+	newNodes, deltaNetMeta, changed := nm.nodePool.applyReceivedUpdates(updates)
+	if changed {
+		nm.session.handleNewNodes(newNodes)
+		msg.Msg = deltaNetMeta.toJson()
+		nm.BroadcastAsync(msg)
+	}
+}
+
+func stubGetTreedocOpToPassOn(treedocOpPackage []byte) ([]byte, bool) {
+	// TODO remove this
+	return nil, false
+}
+
+func (nm *NetworkManager) handleIncomingTreedocOp(msg Message) {
+	// get what should be broadcasted out from treedoc
+	delta, changed := stubGetTreedocOpToPassOn(msg.Msg)
+	if changed {
+		msg.Msg = delta
+		nm.BroadcastAsync(msg)
+	}
+}
+
+func stubGetSyncInfoToReply(versionVector []byte) ([]byte, bool) {
+	// TODO remove this
+	return nil, false
+}
+
+func (nm *NetworkManager) handleIncomingVersionCheck(msg Message) {
+	content, err := newVersionCheckMsgContentFromJson(msg.Msg)
+	if err != nil {
+		return
+	}
+	nm.handleIncomingNetMeta(newNetMetaUpdateMsg(nm.session.id, content.NetworkMeta))
+	syncInfo, shouldReply := stubGetSyncInfoToReply(content.VersionVector)
+	if shouldReply {
+		toSend := newSyncMessage(syncInfo)
+		s := nm.session
+		go func() {
+			s.sendMessageToNodeWithId(toSend, content.Source)
+		}()
+	}
+}
+
+func stubApplySyncInfo(syncInfo []byte) {
+	// TODO remove this
 }
 
 func (nm *NetworkManager) serveBroadcastRequests() {
@@ -123,10 +166,6 @@ func (nm *NetworkManager) BroadcastAsync(msg Message) {
 			nm.broadcastChan <- msg
 		}()
 	}
-}
-
-func (nm *NetworkManager) sendMsgTo(msg Message, id string) {
-	// TODO
 }
 
 func (nm *NetworkManager) GetNetworkMetadata() string {

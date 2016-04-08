@@ -60,6 +60,12 @@ type VersionCheckMsgContent struct {
 	VersionVector []byte
 }
 
+func newVersionCheckMsgContentFromJson(contentJson []byte) (VersionCheckMsgContent, error) {
+	var versionCheckMsgContent VersionCheckMsgContent
+	err := json.Unmarshal(contentJson, &versionCheckMsgContent)
+	return versionCheckMsgContent, err
+}
+
 func (content VersionCheckMsgContent) toJson() []byte {
 	contentJson, _ := json.Marshal(content)
 	return contentJson

@@ -45,6 +45,13 @@ func (np *nodePool) getConnectedNodes() []*node {
 	return nodes
 }
 
+func (np *nodePool) getNodeWithId(id string) (*node, bool) {
+	np.poolMutex.RLock()
+	n, ok := np.pool[id]
+	np.poolMutex.RUnlock()
+	return n, ok
+}
+
 func (np *nodePool) getAllNodes() []*node {
 	np.poolMutex.RLock()
 	defer np.poolMutex.RUnlock()
@@ -66,6 +73,7 @@ func (np *nodePool) disconnectAllNodes() {
 	np.poolMutex.RLock()
 	for _, n := range np.pool {
 		// TODO: check locking issues
+		// TODO: set state to left so threads working on this will stop
 		n.close()
 	}
 	np.poolMutex.RUnlock()

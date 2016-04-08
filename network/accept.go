@@ -30,8 +30,12 @@ func (s *session) handleNewConn(conn net.Conn) {
 		if err != nil {
 			return
 		}
+		incoming, err := newNetMetaFromJson(incomingMeta)
+		if err != nil {
+			return
+		}
 		conn.Close()
-		s.manager.handleIncomingNetMeta(incomingMeta)
+		s.manager.handleIncomingNetMeta(newNetMetaUpdateMsg(s.id, incoming))
 	case dialingTypeConnect:
 		idMatches, err := handleIdCheck(s.id, n)
 		if err != nil || !idMatches {

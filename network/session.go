@@ -125,6 +125,13 @@ func (s *session) broadcast(msg Message) {
 	}
 }
 
+func (s *session) sendMessageToNodeWithId(msg Message, id string) bool {
+	if n, ok := s.manager.nodePool.getNodeWithId(id); ok {
+		return s.sendMessageToNode(msg, n)
+	}
+	return false
+}
+
 func (s *session) sendMessageToNode(msg Message, n *node) bool {
 	msgJson := msg.toJson()
 	n.stateMutex.Lock()
@@ -147,7 +154,7 @@ func (s *session) sendMessageToNode(msg Message, n *node) bool {
 //	if n.state == reconnecting
 //}
 
-func (s *session) periodicallyReconnectNode(n *node) {
+func (s *session) handleNewNodes(n []*node) {
 
 }
 

@@ -58,11 +58,16 @@ func (nm *NetworkManager) clientPoke(remoteAddr string) error {
 	if err != nil {
 		return err
 	}
+	incoming, err := newNetMetaFromJson(incomingMeta)
+	if err != nil {
+		return err
+	}
 	// at this point, we consider the client poke as successful
 	// since we have enough info to be considered as part of the network
 	latestMeta := nm.nodePool.getLatestNetMetaJson()
 	n.writeMessageSlice(latestMeta)
-	nm.handleIncomingNetMeta(incomingMeta)
+	// TODO: refactor and handle
+	nm.handleIncomingNetMeta(newNetMetaUpdateMsg(nm.session.id, incoming))
 	return nil
 }
 
@@ -81,9 +86,13 @@ func (s *session) poke(n *node) error {
 		if err != nil {
 			return err
 		}
+		incoming, err := newNetMetaFromJson(incomingMeta)
+		if err != nil {
+			return err
+		}
 		latestMeta := s.manager.nodePool.getLatestNetMetaJson()
 		err = n.writeMessageSlice(latestMeta)
-		s.manager.handleIncomingNetMeta(incomingMeta)
+		s.manager.handleIncomingNetMeta(newNetMetaUpdateMsg(s.id, incoming))
 		if err != nil {
 			return err
 		}
