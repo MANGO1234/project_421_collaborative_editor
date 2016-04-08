@@ -4,10 +4,10 @@ import (
 	"bytes"
 )
 
-const NO_OPERATION = 0
-const INSERT = 1
-const REMOTE_INSERT = 2
-const DELETE = 3
+const NO_OPERATION = byte(0)
+const INSERT = byte(1)
+const REMOTE_INSERT = byte(2)
+const DELETE = byte(3)
 
 type BufferOperation struct {
 	Type byte
