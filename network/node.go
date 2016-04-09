@@ -4,6 +4,7 @@ import (
 	"../util"
 	"net"
 	"sync"
+	"time"
 )
 
 // Design note:
@@ -15,8 +16,9 @@ import (
 // node state
 const (
 	nodeStateDisconnected = iota
+	nodeStateReconnecting
 	nodeStateConnected
-	reconnecting
+	nodeStateQuitted
 )
 
 type node struct {
@@ -28,7 +30,7 @@ type node struct {
 	conn       net.Conn
 	reader     *util.MessageReader
 	writer     *util.MessageWriter
-	interval   int // current interval to reconnect
+	interval   time.Duration // current interval to reconnect
 }
 
 func newNodeFromAddr(addr string) *node {

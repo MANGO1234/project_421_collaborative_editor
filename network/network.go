@@ -76,7 +76,7 @@ func (nm *NetworkManager) handleIncomingNetMeta(msg Message) {
 	}
 	newNodes, deltaNetMeta, changed := nm.nodePool.applyReceivedUpdates(updates)
 	if changed {
-		nm.session.handleDisconnectedNodes(newNodes)
+		nm.session.handleNewNodes(newNodes)
 		msg.Msg = deltaNetMeta.toJson()
 		nm.BroadcastAsync(msg)
 	}

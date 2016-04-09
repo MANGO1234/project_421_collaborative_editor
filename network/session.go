@@ -154,18 +154,96 @@ func (s *session) sendMessageToNode(msg Message, n *node) bool {
 //	if n.state == reconnecting
 //}
 
-func (s *session) handleDisconnectedNodes(nodes []*node) {
+func (s *session) handleNewNodes(nodes []*node) {
 	for _, n := range nodes {
-		n.stateMutex.Lock()
-		if n.state == nodeStateDisconnected {
-			go s.reconnectNodeThread(n)
-		}
-		n.stateMutex.Unlock()
+		s.launchNodeLifeCycleThread(n)
 	}
 }
 
-func (s *session) reconnectNodeThread(n *node) {
+func (s *session) launchNodeLifeCycleThread(n *node) {
+	n.stateMutex.Lock()
+	defer n.stateMutex.Unlock()
+	if n.state == nodeStateDisconnected {
+		n.state = nodeStateReconnecting
+		go func() {
+			s.startNodeLifeCycle(n)
+		}()
+	}
+}
 
+func (s *session) startNodeLifeCycle(n *node) {
+	if s.manager.addr < n.addr {
+		for {
+			if n.state != nodeStateReconnecting {
+				// we should quit if not the right state
+				return
+			}
+			s.poke(n)
+			n.interval = n.interval + time.Second
+			time.Sleep(n.interval)
+		}
+	} else {
+		s.connect(n)
+	}
+}
+
+func (s *session) poke(n *node) error {
+	n.stateMutex.Lock()
+
+	n.stateMutex.Unlock()
+	err := n.dial(dialingTypePoke)
+	if err != nil {
+		return err
+	}
+	defer n.close()
+	matches, err := n.checkId()
+	if err != nil {
+		return err
+	}
+	if matches {
+		incomingMeta, err := n.readMessageSlice()
+		if err != nil {
+			return err
+		}
+		incoming, err := newNetMetaFromJson(incomingMeta)
+		if err != nil {
+			return err
+		}
+		latestMeta := s.manager.nodePool.getLatestNetMetaJson()
+		err = n.writeMessageSlice(latestMeta)
+		s.manager.handleIncomingNetMeta(newNetMetaUpdateMsg(s.id, incoming))
+		if err != nil {
+			return err
+		}
+		n.close()
+		return nil
+	} else {
+		s.manager.nodePool.forceNodeQuit(n)
+		return nil
+	}
+}
+
+func (s *session) connect(n *node) error {
+	err := n.dial(dialingTypeClientConnect)
+	if err != nil {
+		return err
+	}
+	matches, err := n.checkId()
+	if err != nil {
+		n.close()
+		return err
+	}
+	if matches {
+		err = sendInfoAboutSelf(s.id, s.manager.addr, n)
+		if err != nil {
+			return err
+		}
+		return s.establishConnection(n)
+	} else {
+		n.close()
+		n.handleNodeQuit()
+		return nil
+	}
 }
 
 func (s *session) periodicallyCheckVersion() {

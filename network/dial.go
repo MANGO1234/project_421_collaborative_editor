@@ -31,71 +31,8 @@ func handleDisconnect() {
 
 // }
 
-func (s *session) tryPokeOrConnect(n *node) {
-	if shouldPoke(s.manager.addr, n.addr) {
-		s.poke(n)
-	} else {
-		s.connect(n)
-	}
-}
-func (s *session) poke(n *node) error {
-	err := n.dial(dialingTypePoke)
-	if err != nil {
-		return err
-	}
-	defer n.close()
-	matches, err := n.checkId()
-	if err != nil {
-		return err
-	}
-	if matches {
-		incomingMeta, err := n.readMessageSlice()
-		if err != nil {
-			return err
-		}
-		incoming, err := newNetMetaFromJson(incomingMeta)
-		if err != nil {
-			return err
-		}
-		latestMeta := s.manager.nodePool.getLatestNetMetaJson()
-		err = n.writeMessageSlice(latestMeta)
-		s.manager.handleIncomingNetMeta(newNetMetaUpdateMsg(s.id, incoming))
-		if err != nil {
-			return err
-		}
-		n.close()
-		return nil
-	} else {
-		s.manager.nodePool.forceNodeQuit(n)
-		return nil
-	}
-}
-
 func (n *node) handleNodeQuit() {
 	// TODO
-}
-
-func (s *session) connect(n *node) error {
-	err := n.dial(dialingTypeClientConnect)
-	if err != nil {
-		return err
-	}
-	matches, err := n.checkId()
-	if err != nil {
-		n.close()
-		return err
-	}
-	if matches {
-		err = sendInfoAboutSelf(s.id, s.manager.addr, n)
-		if err != nil {
-			return err
-		}
-		return s.establishConnection(n)
-	} else {
-		n.close()
-		n.handleNodeQuit()
-		return nil
-	}
 }
 
 func sendInfoAboutSelf(id, addr string, n *node) error {
