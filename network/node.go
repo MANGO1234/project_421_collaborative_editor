@@ -23,7 +23,6 @@ const (
 
 type node struct {
 	stateMutex sync.Mutex
-	writeMutex sync.Mutex
 	state      int
 	id         string
 	addr       string
@@ -32,6 +31,15 @@ type node struct {
 	reader     *util.MessageReader
 	writer     *util.MessageWriter
 	interval   time.Duration // current interval to reconnect
+}
+
+func (n *node) putOnSendingQueue(msg Message) {
+	// if the channel buffer is full we just drop it
+	// there's no point in sending way more than the node can handle
+	select {
+	case n.outChan <- msg:
+	default: // dumps the msg if buffer is full
+	}
 }
 
 func newNodeFromAddr(addr string) *node {
