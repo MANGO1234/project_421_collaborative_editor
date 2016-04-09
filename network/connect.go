@@ -30,11 +30,9 @@ import "encoding/json"
 // the purpose of dialing to a node
 const (
 	// client-initiated poke to a remote node
-	dialingTypeClientPoke = "clientpoke"
+	dialingTypeRegister = "register"
 	// poke a known node so it has information to connect
 	dialingTypePoke = "poke"
-	// client-initialed connect to a remote node
-	dialingTypeClientConnect = "clientconnect"
 	// establish persistent connection between the nodes
 	dialingTypeConnect = "connect"
 )

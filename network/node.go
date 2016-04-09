@@ -27,6 +27,7 @@ type node struct {
 	state      int
 	id         string
 	addr       string
+	outChan    chan Message
 	conn       net.Conn
 	reader     *util.MessageReader
 	writer     *util.MessageWriter
@@ -42,10 +43,11 @@ func newNodeFromAddr(addr string) *node {
 func newNodeFromIdAddr(id, addr string) *node {
 	n := newNodeFromAddr(addr)
 	n.id = id
+	n.outChan = make(chan Message, 30)
 	return n
 }
 
-func newNodeFromConn(conn net.Conn) *node {
+func newConnWrapper(conn net.Conn) *node {
 	var n node
 	n.setConn(conn)
 	return &n
@@ -54,9 +56,17 @@ func newNodeFromConn(conn net.Conn) *node {
 // pre-condition: nodeMeta.Left == false
 func newNodeFromIdNodeMeta(id string, nodeMeta NodeMeta) *node {
 	n := newNodeFromIdAddr(id, nodeMeta.Addr)
-
 	n.state = nodeStateDisconnected
 	return n
+}
+
+func (n *node) getSendWrapper() *node {
+	return node{
+		conn:    n.conn,
+		reader:  n.reader,
+		writer:  n.writer,
+		outChan: n.outChan,
+	}
 }
 
 func (n *node) leave() {

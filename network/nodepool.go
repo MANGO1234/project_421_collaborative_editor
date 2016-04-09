@@ -88,10 +88,13 @@ func (np *nodePool) removeNodeFromPool(id string) {
 	np.poolMutex.Unlock()
 }
 
-func (np *nodePool) addNodeToPool(id string, nodeMeta NodeMeta) *node {
+func (np *nodePool) addOrGetNodeFromPool(id string, nodeMeta NodeMeta) *node {
 	np.poolMutex.Lock()
-	n := newNodeFromIdNodeMeta(id, nodeMeta)
-	np.pool[id] = n
+	n, ok := np.pool[id]
+	if !ok {
+		n = newNodeFromIdNodeMeta(id, nodeMeta)
+		np.pool[id] = n
+	}
 	np.poolMutex.Unlock()
 	return n
 }
@@ -106,7 +109,7 @@ func (np *nodePool) applyReceivedUpdates(updates NetMeta) (nodeList []*node, del
 		if n.Left {
 			np.removeNodeFromPool(id)
 		} else {
-			nodeList = append(nodeList, np.addNodeToPool(id, n))
+			nodeList = append(nodeList, np.addOrGetNodeFromPool(id, n))
 		}
 	}
 	return

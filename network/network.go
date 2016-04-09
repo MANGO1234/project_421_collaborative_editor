@@ -139,7 +139,7 @@ func (nm *NetworkManager) GetCurrentId() string {
 // ConnectTo registers the current node into the network of the node
 // whose listening address is remoteAddr
 func (nm *NetworkManager) ConnectTo(remoteAddr string) error {
-	// TODO: maybe make the errors more friendly
+	// TODO: maybe make the errors more friendly as it is user facing
 	if nm.session == nil {
 		err := startNewSessionOnNetworkManager(nm)
 		if err != nil {
@@ -151,8 +151,8 @@ func (nm *NetworkManager) ConnectTo(remoteAddr string) error {
 		return err
 	}
 	defer conn.Close()
-	n := newNodeFromConn(conn)
-	err = n.writeMessage(dialingTypeClientPoke)
+	n := newConnWrapper(conn)
+	err = n.writeMessage(dialingTypeRegister)
 	if err != nil {
 		return err
 	}
