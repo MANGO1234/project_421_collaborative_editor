@@ -1,6 +1,7 @@
 package documentmanager
 
 import (
+	. "../common"
 	. "../version"
 	"reflect"
 	"runtime/debug"
@@ -167,4 +168,19 @@ func TestGetMissingQueueElem(t *testing.T) {
 
 	result := q.GetMissingQueueElem(NewTestVector(2, 2, 0))
 	assertEqual(t, 3, len(result))
+	var a, b, c int
+	for _, elem := range result {
+		if EqualSiteId(elem.Id, A_ID) {
+			a++
+		}
+		if EqualSiteId(elem.Id, B_ID) {
+			b++
+		}
+		if EqualSiteId(elem.Id, C_ID) {
+			c++
+		}
+	}
+	assertEqual(t, 2, a)
+	assertEqual(t, 0, b)
+	assertEqual(t, 1, c)
 }

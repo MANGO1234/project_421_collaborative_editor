@@ -34,7 +34,7 @@ func EqualNodeId(a NodeId, b NodeId) bool {
 	return true
 }
 
-func EqualSiteId(a NodeId, b NodeId) bool {
+func EqualSiteIdInNodeId(a NodeId, b NodeId) bool {
 	for i := 0; i < 16; i++ {
 		if a[i] != b[i] {
 			return false
