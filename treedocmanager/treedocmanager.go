@@ -1,15 +1,16 @@
 package treedocmanager
+
 // This acts as the treedoc manager and manages the creation and modification of treedoc
 // following methods are based on treedoc version 1.
 
 import (
-    "../treedoc"
+	"../treedoc"
 )
 
 // following fields keep track of treedoc info
 var (
-	myDoc *treedoc.DisambiguatorNode
-    currentPos treedoc.PosId
+	myDoc      *treedoc.DisambiguatorNode
+	currentPos treedoc.PosId
 )
 
 // given the nodeId, create a new treedoc
@@ -20,15 +21,15 @@ func CreateTreedoc(nodeId string) {
 	currentPos = GetCurrentPos(0)
 }
 
-func InsertTo(){
+func InsertTo() {
 
 }
 
-func DeleteFrom(){
+func DeleteFrom() {
 
 }
 
-func ChangePos(){
+func ChangePos() {
 
 }
 
@@ -39,6 +40,3 @@ func GetCurrentPos(cursorPos int) treedoc.PosId {
 func getTreedoc() *treedoc.DisambiguatorNode {
 	return nil
 }
-
-
-

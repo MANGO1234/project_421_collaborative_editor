@@ -35,9 +35,9 @@ type PosId []Dir
 //       |DocNode|   |DocNode|...|DocNode|   <- DocNodes
 //       |_L___R_|   |_L___R_|   |_L___R_|
 //         |   |       |   |  ...  |   |
-//      (ooo) (ooo) (ooo) (ooo) (ooo) (ooo)  <- DisambiguatorNodes 
-//      /|  ...                          |\      
-// 
+//      (ooo) (ooo) (ooo) (ooo) (ooo) (ooo)  <- DisambiguatorNodes
+//      /|  ...                          |\
+//
 // ===========================================================
 
 // This is used to deal with concurrent edit to the same location
@@ -159,7 +159,7 @@ func Merge(disambiguator1 *DisambiguatorNode, disambiguator2 *DisambiguatorNode)
 	}
 }
 
-// generate a new treedoc with str at posId 
+// generate a new treedoc with str at posId
 func GenerateDoc(posId PosId, str string) *DisambiguatorNode {
 	root := NewDisambiguatorNode()
 	length := len(posId)
@@ -219,7 +219,6 @@ func DebugDoc(disambiguator *DisambiguatorNode) {
 	}
 }
 
-
 // return a list of DocNode in treedoc (starting at disambiguator) in infix order
 func DocToNodes(disambiguator *DisambiguatorNode) []*DocNode {
 	return DocToNodesHelper(disambiguator, make([]*DocNode, 0, 10))
@@ -237,7 +236,7 @@ func DocToNodesHelper(disambiguator *DisambiguatorNode, slice []*DocNode) []*Doc
 	return slice
 }
 
-// return a buffer of the current contents represented by the treedoc 
+// return a buffer of the current contents represented by the treedoc
 // (starting at disambiguator)
 func DocToBuffer(disambiguator *DisambiguatorNode) *bytes.Buffer {
 	var buf bytes.Buffer
