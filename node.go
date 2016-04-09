@@ -8,7 +8,6 @@ package main
 
 import (
 	"./network"
-	"./treedocmanager"
 	"./util"
 	"bufio"
 	"fmt"
@@ -23,8 +22,6 @@ func main() {
 	}
 
 	networkManager, err := network.NewNetworkManager(os.Args[1])
-	treedocmanager.CreateTreedoc(networkManager.GetCurrentId()) // TODO handle change in id
-	// TODO: link cursor position and treedoc posID
 
 	util.CheckError(err)
 

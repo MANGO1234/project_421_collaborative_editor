@@ -1,6 +1,11 @@
 package version
 
-type SiteId [16]byte
+import (
+	. "../common"
+	"encoding/json"
+	"github.com/satori/go.uuid"
+)
+
 type VersionVector map[SiteId]uint32
 
 const LESS_THAN = -1
@@ -43,16 +48,6 @@ func (vector VersionVector) Copy() VersionVector {
 }
 
 func (v1 VersionVector) Compare(v2 VersionVector) int {
-	if len(v2) > len(v1) {
-		r := v2.Compare(v1)
-		if r == LESS_THAN {
-			return GREATER_THAN
-		} else if r == GREATER_THAN {
-			return LESS_THAN
-		}
-		return r
-	}
-
 	r := EQUAL
 	for k, v := range v1 {
 		if v > v2[k] {
@@ -69,5 +64,50 @@ func (v1 VersionVector) Compare(v2 VersionVector) int {
 			}
 		}
 	}
+
+	for k, v := range v2 {
+		if v > v1[k] {
+			if r == EQUAL {
+				r = LESS_THAN
+			} else if r == GREATER_THAN {
+				return CONFLICT
+			}
+		} else if v < v1[k] {
+			if r == EQUAL {
+				r = GREATER_THAN
+			} else if r == LESS_THAN {
+				return CONFLICT
+			}
+		}
+	}
 	return r
+}
+
+func NewSiteId(id string) SiteId {
+	newUUID, _ := uuid.FromString(id)
+	var siteId [16]byte
+	copy(siteId[:], newUUID.Bytes())
+	return siteId
+}
+
+func (version *VersionVector) MarshalJSON() ([]byte, error) {
+	newVector := make(map[string]uint32)
+	for k, v := range *version {
+		newVector[k.ToString()] = v
+	}
+	return json.Marshal(newVector)
+}
+
+func (version *VersionVector) UnmarshalJSON(data []byte) error {
+	newVector := make(map[string]uint32)
+	if err := json.Unmarshal(data, &newVector); err != nil {
+		return err
+	}
+
+	for k, v := range newVector {
+		id := NewSiteId(k)
+		(*version)[id] = v
+	}
+
+	return nil
 }
