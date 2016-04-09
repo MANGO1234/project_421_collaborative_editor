@@ -61,7 +61,7 @@ func newNodeFromIdNodeMeta(id string, nodeMeta NodeMeta) *node {
 }
 
 func (n *node) getSendWrapper() *node {
-	return node{
+	return &node{
 		conn:    n.conn,
 		reader:  n.reader,
 		writer:  n.writer,

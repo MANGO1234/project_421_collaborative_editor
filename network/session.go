@@ -92,6 +92,21 @@ func (s *session) listenForNewConn() {
 }
 
 func (s *session) broadcast(msg Message) {
+	if msg.Visited == nil {
+
+	} else {
+		s.broadcastRecursive(msg)
+	}
+}
+
+func (s *session) broadcastOnce(msg Message) {
+	connected := s.manager.nodePool.getConnectedNodes()
+	for _, n := range connected {
+		s.sendMessageToNode(msg, n)
+	}
+}
+
+func (s *session) broadcastRecursive(msg Message) {
 	connected := s.manager.nodePool.getConnectedNodes()
 	original := msg.Visited.copyVisitedNodes()
 	msg.Visited.addAllFromNodeList(connected)
@@ -144,7 +159,7 @@ func (s *session) initiateNewNode(n *node) {
 	}
 }
 
-func shouldConnect(localAddr, remoteAddr string) {
+func shouldConnect(localAddr, remoteAddr string) bool {
 	return localAddr < remoteAddr
 }
 
