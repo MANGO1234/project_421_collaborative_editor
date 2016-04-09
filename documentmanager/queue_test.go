@@ -155,3 +155,16 @@ func TestEnqueueDuplicateOperations(t *testing.T) {
 	assertEqual(t, uint32(0), q.Vector().Get(B_ID))
 	assertEqual(t, uint32(2), q.Vector().Get(C_ID))
 }
+
+func TestGetMissingQueueElem(t *testing.T) {
+	q := NewQueue()
+	q.Enqueue(QueueElem{Vector: NewTestVector(0, 0, 0), Id: A_ID, Version: 1})
+	q.Enqueue(QueueElem{Vector: NewTestVector(1, 1, 0), Id: B_ID, Version: 2})
+	q.Enqueue(QueueElem{Vector: NewTestVector(2, 0, 0), Id: A_ID, Version: 3})
+	q.Enqueue(QueueElem{Vector: NewTestVector(3, 0, 0), Id: A_ID, Version: 4})
+	q.Enqueue(QueueElem{Vector: NewTestVector(3, 2, 0), Id: C_ID, Version: 1})
+	assertEqual(t, 4, q.Size())
+
+	result := q.GetMissingQueueElem(NewTestVector(2,2,0))
+	assertEqual(t, 3, len(result))
+}

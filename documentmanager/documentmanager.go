@@ -6,6 +6,7 @@ import (
 	"../treedoc2"
 	"../version"
 	"sync"
+	"encoding/json"
 )
 
 type DocumentModel struct {
@@ -18,6 +19,11 @@ type DocumentModel struct {
 	Log         *OperationLog
 	Queue       *OperationQueue
 	UpdateGUI   func()
+}
+
+type MissingOperation struct {
+	missingOp   []treedoc2.Operation
+	missingElem []QueueElem
 }
 
 func NewDocumentModel(id SiteId, width int, updateGUI func()) *DocumentModel {
@@ -43,7 +49,7 @@ func (model *DocumentModel) LocalInsert(atom byte) {
 	model.Log.Write(model.OwnerId, model.OpVersion, operation)
 	model.OpVersion++
 	model.AssertEqual()
-	BroadcastOperation(model.OpVersion, operation)
+	BroadcastOperation(model.OwnerId, model.OpVersion,model.Queue.Vector(), operation)
 }
 
 func (model *DocumentModel) LocalBackspace() {
@@ -56,7 +62,7 @@ func (model *DocumentModel) LocalBackspace() {
 	model.Log.Write(model.OwnerId, model.OpVersion, operation)
 	model.OpVersion++
 	model.AssertEqual()
-	BroadcastOperation(model.OpVersion, operation)
+	BroadcastOperation(model.OwnerId, model.OpVersion,model.Queue.Vector(), operation)
 }
 
 func (model *DocumentModel) LocalDelete() {
@@ -69,16 +75,11 @@ func (model *DocumentModel) LocalDelete() {
 	model.Log.Write(model.OwnerId, model.OpVersion, operation)
 	model.OpVersion++
 	model.AssertEqual()
-	BroadcastOperation(model.OpVersion, operation)
+	BroadcastOperation(model.OwnerId, model.OpVersion,model.Queue.Vector(), operation)
 }
 
-func (model *DocumentModel) RemoteOperation(vector version.VersionVector, id SiteId, opVersion uint32, operation treedoc2.Operation) {
-	queueElems := model.Queue.Enqueue(QueueElem{
-		Vector:    vector,
-		Id:        id,
-		Version:   opVersion,
-		Operation: operation,
-	})
+func (model *DocumentModel) RemoteOperation(newElem QueueElem) {
+	queueElems := model.Queue.Enqueue(newElem)
 	for _, elem := range queueElems {
 		bufOp := model.Treedoc.ApplyOperation(elem.Operation)
 		model.Buffer.ApplyOperation(bufOp)
@@ -94,6 +95,32 @@ func (model *DocumentModel) AssertEqual() {
 	}
 }
 
-func BroadcastOperation(operationVersion uint32, operation treedoc2.Operation) {
+func BroadcastOperation(id SiteId, opVersion uint32, vector version.VersionVector, operation treedoc2.Operation) {
+	newQueueElem := QueueElem{
+		Vector:    vector,
+		Id:        id,
+		Version:   opVersion,
+		Operation: operation,
+	}
+	json.Marshal(newQueueElem)
+	// TODO : call network to send queue element
 
 }
+
+func (model *DocumentModel) HandleVersionVector(vector version.VersionVector){
+	myVec := model.Queue.Vector()
+	compare := myVec.Compare(vector)
+	if compare == version.GREATER_THAN || compare == version.CONFLICT  {
+		ops := model.Log.GetMissingOperations(vector)
+		queueElem := model.Queue.GetMissingQueueElem(vector)
+		SendMissingOperations(MissingOperation{missingOp: ops, missingElem: queueElem})
+	}
+}
+
+func SendMissingOperations(ops MissingOperation){
+	json.Marshal(ops)
+	// TODO: call network to send missing operations
+}
+
+
+
