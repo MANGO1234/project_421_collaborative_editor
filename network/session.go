@@ -144,7 +144,7 @@ func (s *session) initiateNewNode(n *node) {
 	}
 }
 
-func shouldConnect(localAddr, remoteAddr string) {
+func shouldConnect(localAddr, remoteAddr string) bool {
 	return localAddr < remoteAddr
 }
 

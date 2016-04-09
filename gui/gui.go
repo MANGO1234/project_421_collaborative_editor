@@ -4,6 +4,8 @@ import (
 	"../buffer"
 	. "../common"
 	"../documentmanager"
+	"../network"
+	"fmt"
 	"github.com/nsf/termbox-go"
 	"strconv"
 )
@@ -13,6 +15,8 @@ const STATE_MENU = 0
 const STATE_MENU_RETRY = 1
 const STATE_EXIT = 10
 const STATE_DOCUMENT = 20
+const STATE_CONNECT = 30
+const STATE_ERROR = 40
 
 // Menu Options
 const OPTION_EXIT = "Exit"
@@ -27,6 +31,8 @@ var appState struct {
 	DocModel    *documentmanager.DocumentModel
 	ScreenY     int
 	MenuOptions []string
+	Manager     *network.NetworkManager
+	TempData    interface{}
 }
 
 func doAction(input string) {
@@ -39,8 +45,15 @@ func doAction(input string) {
 		if appState.MenuOptions[n-1] == OPTION_EXIT {
 			appState.State = STATE_EXIT
 		} else if appState.MenuOptions[n-1] == OPTION_CONNECT {
-			appState.Connected = true
+			appState.State = STATE_CONNECT
 		} else if appState.MenuOptions[n-1] == OPTION_DISCONNECT {
+			appState.Manager.Disconnect()
+			if err != nil {
+				appState.State = STATE_ERROR
+				appState.TempData = err
+			} else {
+				appState.Connected = false
+			}
 			appState.Connected = false
 		} else if appState.MenuOptions[n-1] == OPTION_NEW_DOCUMENT {
 			appState.DocModel = newDocument(StringToSiteId("aaaaaaaaaaaaaaaa"))
@@ -51,6 +64,17 @@ func doAction(input string) {
 		} else {
 			appState.State = STATE_MENU_RETRY
 		}
+	} else if appState.State == STATE_CONNECT {
+		err := appState.Manager.ConnectTo(input)
+		if err != nil {
+			appState.State = STATE_ERROR
+			appState.TempData = err
+		} else {
+			appState.State = STATE_MENU
+			appState.Connected = true
+		}
+	} else if appState.State == STATE_ERROR {
+		appState.State = STATE_MENU
 	}
 }
 
@@ -85,11 +109,17 @@ func getPrompt() *buffer.Prompt {
 			str += "Enter number to exectute option: "
 		}
 		return buffer.NewPrompt(str)
+	} else if appState.State == STATE_CONNECT {
+		return buffer.NewPrompt("Enter ip to connect to: ")
+	} else if appState.State == STATE_ERROR {
+		err := appState.TempData.(error)
+		str := fmt.Sprintf("%v\n\nPress Enter to continue", err)
+		return buffer.NewPrompt(str)
 	}
 	panic("UNKNOWN STATE " + strconv.Itoa(appState.State))
 }
 
-func StartMainLoop() {
+func StartMainLoop(manager *network.NetworkManager) {
 	err := termbox.Init()
 	if err != nil {
 		panic(err)
@@ -97,6 +127,7 @@ func StartMainLoop() {
 	defer termbox.Close()
 
 	appState.State = STATE_MENU
+	appState.Manager = manager
 	for {
 		if appState.State == STATE_EXIT {
 			break
