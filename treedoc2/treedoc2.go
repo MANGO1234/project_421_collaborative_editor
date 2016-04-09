@@ -1,37 +1,42 @@
 package treedoc2
 
 import (
-	"bytes"
-	"fmt"
+	"../buffer"
+	"math"
 )
 
-type NodeId [20]byte
+const MAX_ATOMS_PER_NODE = math.MaxUint16
 
 type Document struct {
+	Size  int
 	Doc   []*DocNode
 	Nodes map[NodeId]*DocNode
 }
 
 type DocNode struct {
-	Parent *DocNode
-	NodeId NodeId
-	Atoms  []Atom
+	Parent  *DocNode
+	ParentN uint16
+	NodeId  NodeId
+	Size    int
+	Atoms   []Atom
 }
 
-const UNINITIATED byte = 0
+const UNINITIALIZED byte = 0
 const DEAD byte = 1
 const ALIVE byte = 2
 
 type Atom struct {
 	State byte
 	Atom  byte
+	Size  int
 	Left  []*DocNode
 }
 
-const INSERT_NEW byte = 0
-const INSERT_ROOT byte = 1
-const INSERT byte = 2
-const DELETE byte = 3
+const NO_OPERATION byte = 0
+const INSERT_NEW byte = 1
+const INSERT_ROOT byte = 2
+const INSERT byte = 3
+const DELETE byte = 4
 
 type Operation struct {
 	Type     byte
@@ -43,186 +48,261 @@ type Operation struct {
 }
 
 func NewDocument() *Document {
-	return &Document{make([]*DocNode, 0, 4), make(map[NodeId]*DocNode)}
+	return &Document{Doc: make([]*DocNode, 0, 4), Nodes: make(map[NodeId]*DocNode)}
 }
 
-func insertNode(disambiguator []*DocNode, node *DocNode) []*DocNode {
-	if disambiguator == nil {
-		a := make([]*DocNode, 1, 4)
-		a[0] = node
-		return a
-	}
+// ***************************************************************************************
+// ******************** Operations On Treedoc (Remote operations) ************************
+// ***************************************************************************************
 
-	var a = 0
-	for i := len(disambiguator); i >= 1; i-- {
-		docNode := disambiguator[i-1]
-		if bytes.Compare(node.NodeId[:], docNode.NodeId[:]) > 0 {
-			a = i
-			break
-		}
-	}
-
-	disambiguator = append(disambiguator, node)
-	copy(disambiguator[a+1:], disambiguator[a:])
-	disambiguator[a] = node
-	return disambiguator
-}
-
-func extendAtoms(atoms []Atom, i uint16) []Atom {
-	if atoms == nil {
-		return make([]Atom, i+1, i+5)
-	}
-
-	n := len(atoms)
-	for int(i) >= n {
-		atoms = append(atoms, Atom{})
-		n++
-	}
-	return atoms
-}
-
-func insertAtom(atoms []Atom, atom Atom, i uint16) []Atom {
-	atoms = extendAtoms(atoms, i)
-	atoms[i] = atom
-	return atoms
-}
-
-func ApplyOperation(doc *Document, operation Operation) {
+func (doc *Document) ApplyOperation(operation Operation) buffer.BufferOperation {
 	if operation.Type == INSERT_NEW {
-		InsertNew(doc, operation)
+		return doc.InsertNew(operation)
 	} else if operation.Type == INSERT {
-		Insert(doc, operation)
+		return doc.Insert(operation)
 	} else if operation.Type == DELETE {
-		Delete(doc, operation)
+		return doc.Delete(operation)
 	} else if operation.Type == INSERT_ROOT {
-		InsertRoot(doc, operation)
+		return doc.InsertRoot(operation)
 	}
+	return buffer.BufferOperation{Type: buffer.NO_OPERATION}
 }
 
-func InsertNew(doc *Document, operation Operation) {
+func (doc *Document) InsertNew(operation Operation) buffer.BufferOperation {
 	parent := doc.Nodes[operation.ParentId]
 	newNode := &DocNode{
-		Parent: parent,
-		NodeId: operation.Id,
+		NodeId:  operation.Id,
+		Parent:  parent,
+		ParentN: operation.ParentN,
 	}
-	newNode.Atoms = insertAtom(newNode.Atoms, Atom{Atom: operation.Atom, State: ALIVE}, operation.N)
+	newNode.Atoms = insertAtom(newNode.Atoms, Atom{
+		State: ALIVE,
+		Atom:  operation.Atom,
+		Size:  1,
+	}, operation.N)
 	doc.Nodes[operation.Id] = newNode
 
-	parent.Atoms = extendAtoms(parent.Atoms, operation.ParentN)
+	parent.Atoms = extendAtomToSize(parent.Atoms, operation.ParentN)
 	atom := parent.Atoms[operation.ParentN]
 	parent.Atoms[operation.ParentN] = Atom{
 		State: atom.State,
 		Atom:  atom.Atom,
-		Left:  insertNode(atom.Left, newNode),
+		Size:  atom.Size,
+		Left:  insertNodeIntoDisambiguatorsSorted(atom.Left, newNode),
 	}
+	updateSize(doc, newNode, 1)
+	pos := calcPos(doc, newNode, int(operation.N))
+	return buffer.BufferOperation{Type: buffer.REMOTE_INSERT, Pos: pos, Atom: operation.Atom}
 }
 
-func InsertRoot(doc *Document, operation Operation) {
+func (doc *Document) InsertRoot(operation Operation) buffer.BufferOperation {
 	newNode := &DocNode{
 		Parent: nil,
 		NodeId: operation.Id,
 	}
 	doc.Nodes[operation.Id] = newNode
-	newNode.Atoms = extendAtoms(newNode.Atoms, operation.N)
-	newNode.Atoms[operation.N] = Atom{Atom: operation.Atom, State: ALIVE}
-	doc.Doc = insertNode(doc.Doc, newNode)
+	newNode.Atoms = extendAtomToSize(newNode.Atoms, operation.N)
+	newNode.Atoms[operation.N] = Atom{Atom: operation.Atom, State: ALIVE, Size: 1}
+	doc.Doc = insertNodeIntoDisambiguatorsSorted(doc.Doc, newNode)
+	updateSize(doc, newNode, 1)
+	pos := calcPos(doc, newNode, int(operation.N))
+	return buffer.BufferOperation{Type: buffer.REMOTE_INSERT, Pos: pos, Atom: operation.Atom}
 }
 
-func Delete(doc *Document, operation Operation) {
+func (doc *Document) Insert(operation Operation) buffer.BufferOperation {
 	node := doc.Nodes[operation.Id]
-	node.Atoms = extendAtoms(node.Atoms, operation.N)
+	node.Atoms = extendAtomToSize(node.Atoms, operation.N)
 	atom := node.Atoms[operation.N]
-	node.Atoms[operation.N] = Atom{State: DEAD, Atom: atom.Atom, Left: atom.Left}
+	if atom.State != UNINITIALIZED {
+		panic("Atom is not uninitialized \"" + DocToString(doc) + "\" ")
+	}
+	node.Atoms[operation.N] = Atom{State: ALIVE, Atom: operation.Atom, Left: atom.Left, Size: atom.Size + 1}
+	updateSize(doc, node, 1)
+	pos := calcPos(doc, node, int(operation.N))
+	return buffer.BufferOperation{Type: buffer.REMOTE_INSERT, Pos: pos, Atom: operation.Atom}
 }
 
-func Insert(doc *Document, operation Operation) {
+func (doc *Document) Delete(operation Operation) buffer.BufferOperation {
 	node := doc.Nodes[operation.Id]
-	node.Atoms = extendAtoms(node.Atoms, operation.N)
+	node.Atoms = extendAtomToSize(node.Atoms, operation.N)
 	atom := node.Atoms[operation.N]
-	node.Atoms[operation.N] = Atom{State: ALIVE, Atom: operation.Atom, Left: atom.Left}
+	if atom.State == UNINITIALIZED {
+		panic("Atom is not alive \"" + DocToString(doc) + "\" ")
+	}
+	if atom.State == ALIVE {
+		pos := calcPos(doc, node, int(operation.N))
+		node.Atoms[operation.N] = Atom{State: DEAD, Atom: atom.Atom, Left: atom.Left, Size: atom.Size - 1}
+		updateSize(doc, node, -1)
+		return buffer.BufferOperation{Type: buffer.DELETE, Pos: pos}
+	}
+	return buffer.BufferOperation{Type: buffer.NO_OPERATION}
 }
 
-func DocToBuffer(doc *Document) *bytes.Buffer {
-	var buf bytes.Buffer
-	return docToBufferHelper(doc.Doc, &buf)
-}
+// ***************************************************************************************
+// ******************** Operations From buffer (Local operations) ************************
+// ***************************************************************************************
 
-func DocToString(doc *Document) string {
-	return DocToBuffer(doc).String()
-}
-
-func docToBufferHelper(disambiguator []*DocNode, buf *bytes.Buffer) *bytes.Buffer {
-	for _, node := range disambiguator {
-		for _, atom := range node.Atoms {
-			buf = docToBufferHelper(atom.Left, buf)
-			if atom.State == ALIVE {
-				buf.WriteByte(atom.Atom)
-			}
+func nextNonEmptyNode(i int, nodes []*DocNode) (int, *DocNode) {
+	for i = i + 1; i < len(nodes); i++ {
+		if nodes[i].Size != 0 {
+			return i, nodes[i]
 		}
 	}
-	return buf
+	return i, nil
 }
 
-func DebugDoc(doc *Document) {
-	debugDocHelper(doc.Doc, "")
+func nextNonEmptyAtom(i int, atoms []Atom) int {
+	for i = i + 1; i < len(atoms); i++ {
+		if atoms[i].Size != 0 {
+			return i
+		}
+	}
+	return i
 }
 
-func debugDocHelper(disambiguator []*DocNode, indent string) {
-	for _, node := range disambiguator {
-		for _, atom := range node.Atoms {
-			debugDocHelper(atom.Left, indent+"  ")
-			if atom.State == ALIVE {
-				fmt.Print(indent)
-				fmt.Print("  ")
-				fmt.Printf("%q", atom.Atom)
-				fmt.Print(" ")
-				fmt.Printf("%s\n", node.NodeId)
-			} else if atom.State == DEAD {
-				fmt.Print(indent)
-				fmt.Print(" x")
-				fmt.Printf("%q", atom.Atom)
-				fmt.Print(" ")
-				fmt.Printf("%s\n", node.NodeId)
+func nextNonEmptyOrUninitializedAtom(i int, atoms []Atom) int {
+	for i = i + 1; i < len(atoms); i++ {
+		if atoms[i].Size != 0 || atoms[i].State == UNINITIALIZED {
+			return i
+		}
+	}
+	return i
+}
+
+func findNodePos(pos int, acc int, nodes []*DocNode) (int, *DocNode) {
+	i, node := nextNonEmptyNode(-1, nodes)
+	for i < len(nodes) {
+		if acc+node.Size > pos {
+			return acc, node
+		}
+		acc += node.Size
+		i, node = nextNonEmptyNode(i, nodes)
+	}
+	return acc, nil
+}
+
+func findAtomPos(pos int, acc int, atoms []Atom) (int, int) {
+	i := nextNonEmptyAtom(-1, atoms)
+	for i < len(atoms) {
+		if acc+atoms[i].Size > pos {
+			return acc, i
+		}
+		acc += atoms[i].Size
+		i = nextNonEmptyAtom(i, atoms)
+	}
+	return acc, i
+}
+
+// finds the next node to keep traverse down the tree to find pos, OR find the node and atom
+// where we can immediately insert atom if possible
+func findAtomForInsertHelper(pos int, acc int, nodeId NodeId, node *DocNode, atoms []Atom) (byte, int, int) {
+	i := nextNonEmptyAtom(-1, atoms)
+	potentialInsert := EqualSiteId(nodeId, node.NodeId)
+	for i < len(atoms) {
+		if potentialInsert && acc == pos {
+			if canDoInsert(node, i, nodeId) {
+				return INSERT, acc, i
+			} else {
+				k := nextNonEmptyOrUninitializedAtom(i, atoms)
+				if k < len(atoms) && canDoInsert(node, k, nodeId) {
+					return INSERT, acc, k
+				}
 			}
+		}
+		if acc+atoms[i].Size > pos {
+			return NO_OPERATION, acc, i
+		}
+		acc += atoms[i].Size
+		i = nextNonEmptyAtom(i, atoms)
+	}
+	return NO_OPERATION, acc, i
+}
+
+// traverse the tree until it finds a place to insert (either a new node or reuse an applicable node)
+func insertPosNewHelper(doc *Document, node *DocNode, n int, nodeId NodeId, ch byte) Operation {
+	for {
+		if len(node.Atoms[n].Left) == 0 {
+			op := Operation{Type: INSERT_NEW, Id: nodeId, N: 0, ParentId: node.NodeId, ParentN: uint16(n), Atom: ch}
+			doc.InsertNew(op)
+			return op
+		}
+		node = node.Atoms[n].Left[len(node.Atoms[n].Left)-1]
+		n = len(node.Atoms)
+		if node.Atoms[n-1].State == UNINITIALIZED {
+			n = n - 1
+		}
+		node.Atoms = extendAtomToSize(node.Atoms, uint16(n))
+		if canDoInsert(node, n, nodeId) {
+			return makeAndApplyInsertOperation(doc, node, n, ch)
 		}
 	}
 }
 
-func DocHeight(doc *Document) int {
-	return docHeightHelper(doc.Doc)
+func canDoInsert(node *DocNode, n int, nodeId NodeId) bool {
+	return node.Atoms[n].Size == 0 && node.Atoms[n].State == UNINITIALIZED && EqualSiteId(nodeId, node.NodeId) && n != MAX_ATOMS_PER_NODE
 }
 
-func docHeightHelper(disambiguator []*DocNode) int {
-	max := -1
-	for _, node := range disambiguator {
-		for _, atom := range node.Atoms {
-			a := docHeightHelper(atom.Left) + 1
-			if a > max {
-				max = a
-			}
+func makeAndApplyInsertOperation(doc *Document, node *DocNode, n int, ch byte) Operation {
+	op := Operation{Type: INSERT, Id: node.NodeId, N: uint16(n), Atom: ch}
+	doc.Insert(op)
+	return op
+}
+
+func InsertPos(doc *Document, nodeId NodeId, pos int, ch byte) Operation {
+	if doc.Size == 0 {
+		op := Operation{Type: INSERT_ROOT, Id: nodeId, N: 0, Atom: ch}
+		doc.InsertRoot(op)
+		return op
+	}
+
+	var currentN int
+	var doInsert byte
+	acc, currentNode := findNodePos(pos, 0, doc.Doc)
+	// check for end of the document
+	if currentNode == nil {
+		currentNode := doc.Doc[len(doc.Doc)-1]
+		currentN := len(currentNode.Atoms)
+		if currentNode.Atoms[currentN-1].State == UNINITIALIZED {
+			currentN = currentN - 1
+		}
+		currentNode.Atoms = extendAtomToSize(currentNode.Atoms, uint16(currentN))
+		if canDoInsert(currentNode, currentN, nodeId) {
+			return makeAndApplyInsertOperation(doc, currentNode, currentN, ch)
+		}
+		return insertPosNewHelper(doc, currentNode, currentN, nodeId, ch)
+	}
+	doInsert, acc, currentN = findAtomForInsertHelper(pos, acc, nodeId, currentNode, currentNode.Atoms)
+	if doInsert == INSERT {
+		return makeAndApplyInsertOperation(doc, currentNode, currentN, ch)
+	}
+	for {
+		if acc+currentNode.Atoms[currentN].Size-1 == pos && currentNode.Atoms[currentN].State == ALIVE {
+			return insertPosNewHelper(doc, currentNode, currentN, nodeId, ch)
+		}
+		acc, currentNode = findNodePos(pos, acc, currentNode.Atoms[currentN].Left)
+		doInsert, acc, currentN = findAtomForInsertHelper(pos, acc, nodeId, currentNode, currentNode.Atoms)
+		if doInsert == INSERT {
+			return makeAndApplyInsertOperation(doc, currentNode, currentN, ch)
 		}
 	}
-	return max
+	return Operation{Type: NO_OPERATION}
 }
 
-func DocStat(doc *Document) (int, int) {
-	return docStat(doc.Doc)
-}
-
-func docStat(disambiguator []*DocNode) (int, int) {
-	alive := 0
-	dead := 0
-	for _, node := range disambiguator {
-		for _, atom := range node.Atoms {
-			a, d := docStat(atom.Left)
-			alive += a
-			dead += d
-			if atom.State == ALIVE {
-				alive++
-			} else if atom.State == DEAD {
-				dead++
-			}
-		}
+// traverse the tree until it finds the ALIVE atom at pos
+func posToIdForDel(nodes []*DocNode, pos int) (*DocNode, int) {
+	var currentN int
+	acc, currentNode := findNodePos(pos, 0, nodes)
+	acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
+	for !(acc+currentNode.Atoms[currentN].Size-1 == pos && currentNode.Atoms[currentN].State == ALIVE) {
+		acc, currentNode = findNodePos(pos, acc, currentNode.Atoms[currentN].Left)
+		acc, currentN = findAtomPos(pos, acc, currentNode.Atoms)
 	}
-	return alive, dead
+	return currentNode, currentN
+}
+
+func DeletePos(doc *Document, pos int) Operation {
+	node, n := posToIdForDel(doc.Doc, pos)
+	op := Operation{Type: DELETE, Id: node.NodeId, N: uint16(n)}
+	doc.Delete(op)
+	return op
 }

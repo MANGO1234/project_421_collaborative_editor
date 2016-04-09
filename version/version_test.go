@@ -1,6 +1,7 @@
 package version
 
 import (
+	. "../common"
 	"reflect"
 	"runtime/debug"
 	"testing"
@@ -13,15 +14,9 @@ func assertEqual(t *testing.T, exp, got interface{}) {
 	}
 }
 
-func newId(id string) SiteId {
-	var b [16]byte
-	copy(b[:], id[:])
-	return b
-}
-
-var A_ID = newId("aaaaaaaaaaaaaaaa")
-var B_ID = newId("bbbbbbbbbbbbbbbb")
-var C_ID = newId("cccccccccccccccc")
+var A_ID = StringToSiteId("aaaaaaaaaaaaaaaa")
+var B_ID = StringToSiteId("bbbbbbbbbbbbbbbb")
+var C_ID = StringToSiteId("cccccccccccccccc")
 
 func TestIncrement(t *testing.T) {
 	v := NewVector()
@@ -96,9 +91,25 @@ func TestCompare(t *testing.T) {
 	v1.IncrementTo(B_ID, 2)
 	v1.IncrementTo(C_ID, 1)
 	v2 = NewVector()
-	v2.IncrementTo(A_ID, 5)
+	v2.IncrementTo(A_ID, 4)
 	v2.IncrementTo(B_ID, 2)
-	v2.IncrementTo(B_ID, 3)
+	v2.IncrementTo(C_ID, 3)
+	assertEqual(t, CONFLICT, v1.Compare(v2))
+	assertEqual(t, CONFLICT, v2.Compare(v1))
+
+	v1 = NewVector()
+	v1.IncrementTo(A_ID, 5)
+	v2 = NewVector()
+	v2.IncrementTo(C_ID, 3)
+	assertEqual(t, CONFLICT, v1.Compare(v2))
+	assertEqual(t, CONFLICT, v2.Compare(v1))
+
+	v1 = NewVector()
+	v1.IncrementTo(A_ID, 6)
+	v1.IncrementTo(B_ID, 2)
+	v2 = NewVector()
+	v2.IncrementTo(B_ID, 2)
+	v2.IncrementTo(C_ID, 1)
 	assertEqual(t, CONFLICT, v1.Compare(v2))
 	assertEqual(t, CONFLICT, v2.Compare(v1))
 }
