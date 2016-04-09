@@ -31,15 +31,6 @@ func handleDisconnect() {
 
 // }
 
-// client uses this to register itself to a remote network
-func (nm *NetworkManager) register(remoteAddr string) error {
-	if shouldPoke(nm.addr, remoteAddr) {
-		return nm.clientPoke(remoteAddr)
-	} else {
-		return nm.clientConnect(remoteAddr)
-	}
-}
-
 func (s *session) tryPokeOrConnect(n *node) {
 	if shouldPoke(s.manager.addr, n.addr) {
 		s.poke(n)
@@ -47,30 +38,6 @@ func (s *session) tryPokeOrConnect(n *node) {
 		s.connect(n)
 	}
 }
-
-func (nm *NetworkManager) clientPoke(remoteAddr string) error {
-	n := newNodeFromAddr(remoteAddr)
-	err := n.dial(dialingTypeClientPoke)
-	if err != nil {
-		return err
-	}
-	incomingMeta, err := n.readMessageSlice()
-	if err != nil {
-		return err
-	}
-	incoming, err := newNetMetaFromJson(incomingMeta)
-	if err != nil {
-		return err
-	}
-	// at this point, we consider the client poke as successful
-	// since we have enough info to be considered as part of the network
-	latestMeta := nm.nodePool.getLatestNetMetaJson()
-	n.writeMessageSlice(latestMeta)
-	// TODO: refactor and handle
-	nm.handleIncomingNetMeta(newNetMetaUpdateMsg(nm.session.id, incoming))
-	return nil
-}
-
 func (s *session) poke(n *node) error {
 	err := n.dial(dialingTypePoke)
 	if err != nil {
@@ -106,24 +73,6 @@ func (s *session) poke(n *node) error {
 
 func (n *node) handleNodeQuit() {
 	// TODO
-}
-
-func (nm *NetworkManager) clientConnect(remoteAddr string) error {
-	n := newNodeFromAddr(remoteAddr)
-	err := n.dial(dialingTypeClientConnect)
-	if err != nil {
-		return err
-	}
-	remoteId, err := n.readMessage()
-	if err != nil {
-		return err
-	}
-	n.id = remoteId
-	err = sendInfoAboutSelf(nm.id, nm.addr, n)
-	if err != nil {
-		return err
-	}
-	return nm.session.establishConnection(n)
 }
 
 func (s *session) connect(n *node) error {

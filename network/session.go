@@ -150,11 +150,21 @@ func (s *session) sendMessageToNode(msg Message, n *node) bool {
 }
 
 //func (s *session) reconnectNode(n *node) {
-//	n.stateMutex.Lock()
+//	n.stateMutex.Lock
 //	if n.state == reconnecting
 //}
 
-func (s *session) handleNewNodes(n []*node) {
+func (s *session) handleDisconnectedNodes(nodes []*node) {
+	for _, n := range nodes {
+		n.stateMutex.Lock()
+		if n.state == nodeStateDisconnected {
+			go s.reconnectNodeThread(n)
+		}
+		n.stateMutex.Unlock()
+	}
+}
+
+func (s *session) reconnectNodeThread(n *node) {
 
 }
 

@@ -3,12 +3,11 @@ package network
 import "net"
 
 func (s *session) handleNewConn(conn net.Conn) {
-	s.Add(1)
-	defer s.Done()
 	n := newNodeFromConn(conn)
 	// distinguish purpose of this connection
 	purpose, err := n.readMessage()
 	if err != nil {
+		conn.Close()
 		return
 	}
 	switch purpose {
@@ -20,22 +19,24 @@ func (s *session) handleNewConn(conn net.Conn) {
 		}
 		fallthrough
 	case dialingTypeClientPoke:
-		// send latest netmeta to the connecting node
-		latestMeta := s.manager.nodePool.getLatestNetMetaJson()
-		err = n.writeMessageSlice(latestMeta)
+		latestNetMeta := s.manager.nodePool.getLatestNetMetaJson()
+		err = n.writeMessageSlice(latestNetMeta)
 		if err != nil {
+			conn.Close()
 			return
 		}
-		incomingMeta, err := n.readMessageSlice()
+		incomingNetMeta, err := n.readMessageSlice()
 		if err != nil {
+			conn.Close()
 			return
 		}
-		incoming, err := newNetMetaFromJson(incomingMeta)
+		incoming, err := newNetMetaFromJson(incomingNetMeta)
 		if err != nil {
+			conn.Close()
 			return
 		}
 		conn.Close()
-		s.manager.handleIncomingNetMeta(newNetMetaUpdateMsg(s.id, incoming))
+		s.manager.msgChan <- newNetMetaUpdateMsg(s.id, incoming)
 	case dialingTypeConnect:
 		idMatches, err := handleIdCheck(s.id, n)
 		if err != nil || !idMatches {

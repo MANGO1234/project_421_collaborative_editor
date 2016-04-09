@@ -11,6 +11,7 @@ package network
 
 import (
 	"errors"
+	"net"
 )
 
 type NetworkManager struct {
@@ -23,8 +24,8 @@ type NetworkManager struct {
 }
 
 var (
-	ErrAlreadyConnected   = errors.New("network: already connected")
-	ErrAlreadyDisonnected = errors.New("network: already disconnected")
+	ErrAlreadyConnected    = errors.New("network: already connected")
+	ErrAlreadyDisconnected = errors.New("network: already disconnected")
 )
 
 // NewNetworkManager initiate a new NetworkManager with listening
@@ -45,6 +46,7 @@ func NewNetworkManager(addr string) (*NetworkManager, error) {
 	return &manager, nil
 }
 
+// TODO: De said to reduce this and merge things together
 func (nm *NetworkManager) serveIncomingMessages() {
 	for msg := range nm.msgChan {
 		switch msg.Type {
@@ -74,7 +76,7 @@ func (nm *NetworkManager) handleIncomingNetMeta(msg Message) {
 	}
 	newNodes, deltaNetMeta, changed := nm.nodePool.applyReceivedUpdates(updates)
 	if changed {
-		nm.session.handleNewNodes(newNodes)
+		nm.session.handleDisconnectedNodes(newNodes)
 		msg.Msg = deltaNetMeta.toJson()
 		nm.BroadcastAsync(msg)
 	}
@@ -129,22 +131,53 @@ func (nm *NetworkManager) GetCurrentId() string {
 	return nm.id
 }
 
+// Notes on implementation of ConnectTo:
+// To simplify the flow and design, we do not try to establish connection
+// in the user command thread. Instead we put the load on the message handler
+// which will in turn manage all connections
+
 // ConnectTo registers the current node into the network of the node
 // whose listening address is remoteAddr
 func (nm *NetworkManager) ConnectTo(remoteAddr string) error {
+	// TODO: maybe make the errors more friendly
 	if nm.session == nil {
 		err := startNewSessionOnNetworkManager(nm)
 		if err != nil {
 			return err
 		}
 	}
-	return nm.register(remoteAddr)
+	conn, err := net.Dial("tcp", remoteAddr)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+	n := newNodeFromConn(conn)
+	err = n.writeMessage(dialingTypeClientPoke)
+	if err != nil {
+		return err
+	}
+	incomingNetMeta, err := n.readMessageSlice()
+	if err != nil {
+		return err
+	}
+	incoming, err := newNetMetaFromJson(incomingNetMeta)
+	if err != nil {
+		return err
+	}
+	defer func() { nm.msgChan <- newNetMetaUpdateMsg(nm.id, incoming) }()
+	latestNetMeta := nm.nodePool.getLatestNetMetaJson()
+	err = n.writeMessageSlice(latestNetMeta)
+	if err != nil {
+		return errors.New("Partially connected: unable to send message to " +
+			"requested node, but was able to receive information.")
+	}
+	return nil
 }
 
 // Disconnect disconnects from the rest of the network voluntarily
 func (nm *NetworkManager) Disconnect() error {
 	if nm.session == nil {
-		return ErrAlreadyDisonnected
+		return ErrAlreadyDisconnected
 	}
 	nm.session.end()
 	nm.session = nil

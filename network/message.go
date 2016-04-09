@@ -80,3 +80,9 @@ func (msg *Message) toJson() []byte {
 	msgJson, _ := json.Marshal(msg)
 	return msgJson
 }
+
+func newMessageFromJson(msgJson []byte) (Message, error) {
+	var msg Message
+	err := json.Unmarshal(msgJson, &msg)
+	return msg, err
+}

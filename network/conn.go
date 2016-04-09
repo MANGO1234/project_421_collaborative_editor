@@ -37,3 +37,15 @@ func (n *node) readMessage() (string, error) {
 func (n *node) readMessageSlice() ([]byte, error) {
 	return n.reader.ReadMessageSlice()
 }
+
+func (n *node) sendMessage(msg Message) error {
+	return n.writeMessageSlice(msg.toJson())
+}
+
+func (n *node) receiveMessage() (Message, error) {
+	msgJson, err := n.readMessageSlice()
+	if err != nil {
+		return Message{}, err
+	}
+	return newMessageFromJson(msgJson)
+}

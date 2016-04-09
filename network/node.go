@@ -14,11 +14,9 @@ import (
 
 // node state
 const (
-	nodeStateUninitialized = iota
+	nodeStateDisconnected = iota
 	nodeStateConnected
-	nodeStateDisconnected
 	reconnecting
-	nodeStateLeft
 )
 
 type node struct {
@@ -62,7 +60,6 @@ func newNodeFromIdNodeMeta(id string, nodeMeta NodeMeta) *node {
 func (n *node) leave() {
 	// TODO: figure out locking
 	n.close()
-	n.state = nodeStateLeft
 }
 
 // if err occurs, close conn, set state to disconnect
