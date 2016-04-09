@@ -156,6 +156,7 @@ func (s *session) receiveThread(n *node) {
 			if shouldConnect(s.manager.addr, n.addr) {
 				go s.connectThread(n)
 			}
+			return
 		}
 		s.manager.msgChan <- msg
 	}
