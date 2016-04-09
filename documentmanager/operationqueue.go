@@ -78,11 +78,11 @@ func dequeHelper(result []QueueElem, queue *OperationQueue, upto int) ([]QueueEl
 
 func (queue *OperationQueue) GetMissingQueueElem(vector VersionVector) []QueueElem {
 	q := queue.queue
-	result := make([]QueueElem,0)
+	result := make([]QueueElem, 0)
 	for i := 0; i < len(q); i++ {
 		elem := q[i]
 		if vector.Get(elem.Id) < elem.Version {
-			result = append(result,elem)
+			result = append(result, elem)
 		}
 	}
 	return result

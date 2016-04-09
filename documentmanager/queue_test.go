@@ -165,6 +165,6 @@ func TestGetMissingQueueElem(t *testing.T) {
 	q.Enqueue(QueueElem{Vector: NewTestVector(3, 2, 0), Id: C_ID, Version: 1})
 	assertEqual(t, 4, q.Size())
 
-	result := q.GetMissingQueueElem(NewTestVector(2,2,0))
+	result := q.GetMissingQueueElem(NewTestVector(2, 2, 0))
 	assertEqual(t, 3, len(result))
 }

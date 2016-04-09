@@ -5,8 +5,8 @@ import (
 	. "../common"
 	"../treedoc2"
 	"../version"
-	"sync"
 	"encoding/json"
+	"sync"
 )
 
 type DocumentModel struct {
@@ -49,7 +49,7 @@ func (model *DocumentModel) LocalInsert(atom byte) {
 	model.Log.Write(model.OwnerId, model.OpVersion, operation)
 	model.OpVersion++
 	model.AssertEqual()
-	BroadcastOperation(model.OwnerId, model.OpVersion,model.Queue.Vector(), operation)
+	BroadcastOperation(model.OwnerId, model.OpVersion, model.Queue.Vector(), operation)
 }
 
 func (model *DocumentModel) LocalBackspace() {
@@ -62,7 +62,7 @@ func (model *DocumentModel) LocalBackspace() {
 	model.Log.Write(model.OwnerId, model.OpVersion, operation)
 	model.OpVersion++
 	model.AssertEqual()
-	BroadcastOperation(model.OwnerId, model.OpVersion,model.Queue.Vector(), operation)
+	BroadcastOperation(model.OwnerId, model.OpVersion, model.Queue.Vector(), operation)
 }
 
 func (model *DocumentModel) LocalDelete() {
@@ -75,7 +75,7 @@ func (model *DocumentModel) LocalDelete() {
 	model.Log.Write(model.OwnerId, model.OpVersion, operation)
 	model.OpVersion++
 	model.AssertEqual()
-	BroadcastOperation(model.OwnerId, model.OpVersion,model.Queue.Vector(), operation)
+	BroadcastOperation(model.OwnerId, model.OpVersion, model.Queue.Vector(), operation)
 }
 
 func (model *DocumentModel) RemoteOperation(newElem QueueElem) {
@@ -107,20 +107,17 @@ func BroadcastOperation(id SiteId, opVersion uint32, vector version.VersionVecto
 
 }
 
-func (model *DocumentModel) HandleVersionVector(vector version.VersionVector){
+func (model *DocumentModel) HandleVersionVector(vector version.VersionVector) {
 	myVec := model.Queue.Vector()
 	compare := myVec.Compare(vector)
-	if compare == version.GREATER_THAN || compare == version.CONFLICT  {
+	if compare == version.GREATER_THAN || compare == version.CONFLICT {
 		ops := model.Log.GetMissingOperations(vector)
 		queueElem := model.Queue.GetMissingQueueElem(vector)
 		SendMissingOperations(MissingOperation{missingOp: ops, missingElem: queueElem})
 	}
 }
 
-func SendMissingOperations(ops MissingOperation){
+func SendMissingOperations(ops MissingOperation) {
 	json.Marshal(ops)
 	// TODO: call network to send missing operations
 }
-
-
-
