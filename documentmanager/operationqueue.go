@@ -30,7 +30,9 @@ func (queue *OperationQueue) Enqueue(elem RemoteOperation, vector VersionVector)
 			return result
 		}
 	}
-	queue.queue = append(queue.queue, elem)
+	if vector.Get(elem.Id) < elem.Version {
+		queue.queue = append(queue.queue, elem)
+	}
 	return nil
 }
 

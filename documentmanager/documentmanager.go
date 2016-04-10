@@ -5,7 +5,6 @@ import (
 	. "../common"
 	"../treedoc2"
 	"../version"
-	"encoding/json"
 	"fmt"
 	"sync"
 )
@@ -127,22 +126,11 @@ func (model *DocumentModel) RemoveBroadcastRemote() {
 	model.BroadcastRemote = nil
 }
 
-type MissingOperation struct {
-	missingOp   []treedoc2.Operation
-	missingElem []RemoteOperation
-}
-
 func (model *DocumentModel) HandleVersionVector(vector version.VersionVector) {
 	myVec := model.Log.Vector.Copy()
 	compare := myVec.Compare(vector)
 	if compare == version.GREATER_THAN || compare == version.CONFLICT {
-		ops := model.Log.GetMissingOperations(vector)
-		queueOps := model.Queue.GetMissingRemoteOperations(vector)
-		SendMissingOperations(MissingOperation{missingOp: ops, missingElem: queueOps})
+		//ops := model.Log.GetMissingOperations(vector)
+		//queueOps := model.Queue.GetMissingRemoteOperations(vector)
 	}
-}
-
-func SendMissingOperations(ops MissingOperation) {
-	json.Marshal(ops)
-	// TODO: call network to send missing operations
 }
