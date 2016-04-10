@@ -23,11 +23,6 @@ type DocumentModel struct {
 	BroadcastRemote func(RemoteOperation)
 }
 
-type MissingOperation struct {
-	missingOp   []treedoc2.Operation
-	missingElem []QueueElem
-}
-
 func NewDocumentModel(id SiteId, width int, updateGUI func()) *DocumentModel {
 	return &DocumentModel{
 		OwnerId:   id,
@@ -100,16 +95,11 @@ func (model *DocumentModel) LocalDelete() {
 func (model *DocumentModel) ApplyRemoteOperation(op RemoteOperation) {
 	model.Lock()
 	defer model.Unlock()
-	queueElems := model.Queue.Enqueue(QueueElem{
-		Vector:    op.Vector,
-		Id:        op.Id,
-		Version:   op.Version,
-		Operation: op.Op,
-	}, model.Log.Vector.Copy())
-	for _, elem := range queueElems {
-		bufOp := model.Treedoc.ApplyOperation(elem.Operation)
+	queueOps := model.Queue.Enqueue(op, model.Log.Vector.Copy())
+	for _, queueOp := range queueOps {
+		bufOp := model.Treedoc.ApplyOperation(queueOp.Op)
 		model.Buffer.ApplyOperation(bufOp)
-		model.Log.Write(elem.Id, elem.Version, elem.Operation)
+		model.Log.Write(queueOp.Id, queueOp.Version, queueOp.Op)
 		model.AssertEqual()
 	}
 	//model.Debug()
@@ -137,13 +127,18 @@ func (model *DocumentModel) RemoveBroadcastRemote() {
 	model.BroadcastRemote = nil
 }
 
+type MissingOperation struct {
+	missingOp   []treedoc2.Operation
+	missingElem []RemoteOperation
+}
+
 func (model *DocumentModel) HandleVersionVector(vector version.VersionVector) {
 	myVec := model.Log.Vector.Copy()
 	compare := myVec.Compare(vector)
 	if compare == version.GREATER_THAN || compare == version.CONFLICT {
 		ops := model.Log.GetMissingOperations(vector)
-		queueElem := model.Queue.GetMissingQueueElem(vector)
-		SendMissingOperations(MissingOperation{missingOp: ops, missingElem: queueElem})
+		queueOps := model.Queue.GetMissingRemoteOperations(vector)
+		SendMissingOperations(MissingOperation{missingOp: ops, missingElem: queueOps})
 	}
 }
 
