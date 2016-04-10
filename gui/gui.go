@@ -5,7 +5,6 @@ import (
 	. "../common"
 	"../documentmanager"
 	"../network"
-	"../treedoc2"
 	"fmt"
 	"github.com/nsf/termbox-go"
 	"strconv"
@@ -48,7 +47,6 @@ func doAction(input string) {
 			appState.State = STATE_CONNECT
 		} else if appState.MenuOptions[n-1] == OPTION_DISCONNECT {
 			appState.Manager.Disconnect()
-			appState.DocModel.RemoveBroadcastRemote()
 			if err != nil {
 				appState.State = STATE_ERROR
 				appState.TempData = err
@@ -64,8 +62,6 @@ func doAction(input string) {
 		}
 	} else if appState.State == STATE_CONNECT {
 		err := appState.Manager.ConnectTo(input)
-		appState.DocModel.SetBroadcastRemote(func(version uint32, op treedoc2.Operation) {
-		})
 		if err != nil {
 			appState.State = STATE_ERROR
 			appState.TempData = err
