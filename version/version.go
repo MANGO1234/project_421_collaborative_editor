@@ -114,8 +114,11 @@ func (version VersionVector) MarshalJSON() []byte {
 	return b
 }
 
-func UnmarshalJSON(data []byte) VersionVector {
+func UnmarshalJSON(data []byte) (error, VersionVector) {
 	var newVector VersionVectorJson
-	json.Unmarshal(data, &newVector)
-	return FromVersionVectorJson(newVector)
+	err := json.Unmarshal(data, &newVector)
+	if err != nil {
+		return nil, FromVersionVectorJson(newVector)
+	}
+	return err, nil
 }

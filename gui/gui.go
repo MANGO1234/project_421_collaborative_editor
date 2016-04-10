@@ -5,6 +5,7 @@ import (
 	. "../common"
 	"../documentmanager"
 	"../network"
+	"../version"
 	"fmt"
 	"github.com/nsf/termbox-go"
 	"github.com/satori/go.uuid"
@@ -136,7 +137,16 @@ func StartMainLoop(manager *network.NetworkManager) {
 		}
 	})
 	appState.Manager.SetVersionCheckHandler(func(data []byte) ([]byte, bool) {
-		return nil, false
+		err, vector := version.UnmarshalJSON(data)
+		if appState.DocModel != nil && err == nil {
+			ops, queueOps := appState.DocModel.GetMissingOperations(vector)
+			fmt.Println()
+			fmt.Println(ops)
+			fmt.Println(queueOps)
+			return nil, false
+		} else {
+			return nil, false
+		}
 	})
 	for {
 		if appState.State == STATE_EXIT {

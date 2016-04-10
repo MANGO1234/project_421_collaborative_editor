@@ -125,11 +125,13 @@ func (model *DocumentModel) GetVersionVectorReceived() version.VersionVector {
 	return v
 }
 
-func (model *DocumentModel) VersionVectorCheck(id SiteId, vector version.VersionVector) {
-	myVec := model.Log.Vector.Copy()
+func (model *DocumentModel) GetMissingOperations(vector version.VersionVector) ([]RemoteOperation, []RemoteOperation) {
+	myVec := model.GetVersionVectorReceived()
 	compare := myVec.Compare(vector)
 	if compare == version.GREATER_THAN || compare == version.CONFLICT {
-		//ops := model.Log.GetMissingOperations(vector)
-		//queueOps := model.Queue.GetMissingOperations(vector)
+		ops := model.Log.GetMissingOperations(vector)
+		queueOps := model.Queue.GetMissingOperations(vector)
+		return ops, queueOps
 	}
+	return nil, nil
 }
