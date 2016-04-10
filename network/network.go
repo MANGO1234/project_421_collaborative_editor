@@ -43,19 +43,15 @@ func NewNetworkManager(addr string) (*NetworkManager, error) {
 	return &manager, nil
 }
 
-// TODO: De said to reduce this and merge things together
 func (nm *NetworkManager) serveIncomingMessages() {
 	for msg := range nm.msgChan {
 		switch msg.Type {
-		case msgTypeNetMetaUpdate:
+		case MSG_TYPE_NET_META_UPDATE:
 			nm.handleIncomingNetMeta(msg)
-		case msgTypeTreedocOp:
+		case MSG_TYPE_TREEDOC_OP:
 			nm.handleIncomingTreedocOp(msg)
-		case msgTypeVersionCheck:
+		case MSG_TYPE_VERSION_CHECK:
 			nm.handleIncomingVersionCheck(msg)
-		case msgTypeSync:
-			// TODO: give this to treedoc manager
-			stubApplySyncInfo(msg.Msg)
 		default:
 			// ignore and do nothing
 		}
@@ -102,15 +98,11 @@ func (nm *NetworkManager) handleIncomingVersionCheck(msg Message) {
 	nm.handleIncomingNetMeta(newNetMetaUpdateMsg(nm.session.id, content.NetworkMeta))
 	syncInfo, shouldReply := stubGetSyncInfoToReply(content.VersionVector)
 	if shouldReply {
-		toSend := newSyncMessage(syncInfo)
+		toSend := NewBroadcastMessage(nm.session.id, MSG_TYPE_SYNC, syncInfo)
 		go func() {
 			nm.nodePool.sendMessageToNodeWithId(toSend, content.Source)
 		}()
 	}
-}
-
-func stubApplySyncInfo(syncInfo []byte) {
-	// TODO remove this
 }
 
 func (nm *NetworkManager) GetCurrentId() string {
@@ -185,4 +177,8 @@ func (nm *NetworkManager) Broadcast(msg Message) {
 
 func (nm *NetworkManager) GetNetworkMetadata() string {
 	return string(nm.nodePool.getLatestNetMetaJsonPrettyPrint())
+}
+
+func (nm *NetworkManager) GetNodePool() *nodePool {
+	return nm.nodePool
 }

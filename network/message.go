@@ -2,12 +2,11 @@ package network
 
 import "encoding/json"
 
-// message types of messages sent to existing connection
 const (
-	msgTypeVersionCheck  = "versioncheck" // no broadcast
-	msgTypeSync          = "sync"         // no broadcast
-	msgTypeNetMetaUpdate = "netmeta"      // broadcast
-	msgTypeTreedocOp     = "treedocOp"    // broadcast
+	MSG_TYPE_VERSION_CHECK   = "versioncheck" // no broadcast
+	MSG_TYPE_NET_META_UPDATE = "netmeta"      // broadcast
+	MSG_TYPE_TREEDOC_OP      = "treedocOp"    // broadcast
+	MSG_TYPE_SYNC            = "sync"         // broadcast
 )
 
 // TODO: for convenience, we are passing json around with possibly
@@ -24,7 +23,7 @@ type Message struct {
 	Msg     []byte
 }
 
-func newBroadcastMessage(id, msgType string, content []byte) Message {
+func NewBroadcastMessage(id, msgType string, content []byte) Message {
 	return Message{
 		msgType,
 		map[string]struct{}{id: struct{}{}},
@@ -33,7 +32,7 @@ func newBroadcastMessage(id, msgType string, content []byte) Message {
 }
 
 func newNetMetaUpdateMsg(id string, delta NetMeta) Message {
-	return newBroadcastMessage(id, msgTypeNetMetaUpdate, delta.toJson())
+	return NewBroadcastMessage(id, MSG_TYPE_NET_META_UPDATE, delta.toJson())
 }
 
 func newSyncOrCheckMessage(msgType string, content []byte) Message {
@@ -42,10 +41,6 @@ func newSyncOrCheckMessage(msgType string, content []byte) Message {
 		nil,
 		content,
 	}
-}
-
-func newSyncMessage(content []byte) Message {
-	return newSyncOrCheckMessage(msgTypeSync, content)
 }
 
 type VersionCheckMsgContent struct {

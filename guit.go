@@ -8,7 +8,6 @@ import (
 )
 
 func main() {
-	// parse args.
 	if len(os.Args) != 2 {
 		fmt.Fprintf(os.Stderr, "Usage: %s [ip:port]\n", os.Args[0])
 		os.Exit(1)

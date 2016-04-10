@@ -5,6 +5,7 @@ import (
 	. "../common"
 	"../documentmanager"
 	"../network"
+	"../treedoc2"
 	"fmt"
 	"github.com/nsf/termbox-go"
 	"strconv"
@@ -27,7 +28,6 @@ const OPTION_CLOSE_DOCUMENT = "Close Document"
 
 var appState struct {
 	State       int
-	Connected   bool
 	DocModel    *documentmanager.DocumentModel
 	ScreenY     int
 	MenuOptions []string
@@ -48,13 +48,11 @@ func doAction(input string) {
 			appState.State = STATE_CONNECT
 		} else if appState.MenuOptions[n-1] == OPTION_DISCONNECT {
 			appState.Manager.Disconnect()
+			appState.DocModel.RemoveBroadcastRemote()
 			if err != nil {
 				appState.State = STATE_ERROR
 				appState.TempData = err
-			} else {
-				appState.Connected = false
 			}
-			appState.Connected = false
 		} else if appState.MenuOptions[n-1] == OPTION_NEW_DOCUMENT {
 			appState.DocModel = newDocument(StringToSiteId("aaaaaaaaaaaaaaaa"))
 			appState.ScreenY = 0
@@ -66,12 +64,13 @@ func doAction(input string) {
 		}
 	} else if appState.State == STATE_CONNECT {
 		err := appState.Manager.ConnectTo(input)
+		appState.DocModel.SetBroadcastRemote(func(version uint32, op treedoc2.Operation) {
+		})
 		if err != nil {
 			appState.State = STATE_ERROR
 			appState.TempData = err
 		} else {
 			appState.State = STATE_MENU
-			appState.Connected = true
 		}
 	} else if appState.State == STATE_ERROR {
 		appState.State = STATE_MENU
@@ -82,11 +81,8 @@ func getPrompt() *buffer.Prompt {
 	if appState.State == STATE_MENU || appState.State == STATE_MENU_RETRY {
 		options := make([]string, 0, 10)
 		options = append(options, OPTION_EXIT)
-		if appState.Connected {
-			options = append(options, OPTION_DISCONNECT)
-		} else {
-			options = append(options, OPTION_CONNECT)
-		}
+		options = append(options, OPTION_CONNECT)
+		options = append(options, OPTION_DISCONNECT)
 		if appState.DocModel == nil {
 			options = append(options, OPTION_NEW_DOCUMENT)
 		} else {
@@ -99,6 +95,8 @@ func getPrompt() *buffer.Prompt {
 			str += strconv.Itoa(i+1) + ". " + option + "\n"
 		}
 		str += "\n"
+		str += appState.Manager.GetNetworkMetadata()
+		str += "\n\n"
 		if appState.DocModel != nil {
 			str += "Esc to switch between menu and editing the document\n"
 			str += "\n"
