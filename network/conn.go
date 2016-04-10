@@ -43,32 +43,37 @@ func (n *node) close() {
 }
 
 
-func (n *node) writeMessageSlice(msg []byte) error {
-	msgByte :=  n.logger.PrepareSend("send bytes", msg)
+func (n *node) writeLog(buf interface{}) error{
+	msgByte :=  n.logger.PrepareSend("send byte", buf)
 	err := n.writer.WriteMessageSlice(msgByte)
 	return err
 }
 
+func (n *node) readLog(unpack interface{}) error{
+	msg, err := n.reader.ReadMessageSlice()
+	n.logger.UnpackReceive("receive byte", msg, unpack)
+	return err
+}
+
+func (n *node) writeMessageSlice(msg []byte) error {
+	return n.writer.WriteMessageSlice(msg)
+}
+
 func (n *node) writeMessage(msg string) error {
-	msgByte :=  n.logger.PrepareSend("send string", []byte(msg))
-	//return n.writer.WriteMessage(msgByte)
+	msgByte :=  n.logger.PrepareSend("send string", msg)
 	err := n.writer.WriteMessageSlice(msgByte)
 	return err
 }
 
 func (n *node) readMessage() (string, error) {
 	msg, err := n.reader.ReadMessageSlice()
-	//msg, err := n.reader.ReadMessage()
-	var incomingMessage []byte
-	n.logger.UnpackReceive("receive string", msg, &incomingMessage)
-	return string(msg), err
+	var unpack string
+	n.logger.UnpackReceive("receive string", msg, &unpack)
+	return unpack, err
 }
 
 func (n *node) readMessageSlice() ([]byte, error) {
-	msg, err := n.reader.ReadMessageSlice()
-	var incomingMessage []byte
-	n.logger.UnpackReceive("receive byte", msg, &incomingMessage)
-	return msg, err
+	return n.reader.ReadMessageSlice()
 }
 
 func (n *node) sendMessage(msg Message) error {
@@ -77,8 +82,6 @@ func (n *node) sendMessage(msg Message) error {
 
 func (n *node) receiveMessage() (Message, error) {
 	msgJson, err := n.readMessageSlice()
-	msg := new(Message)
-	n.logger.UnpackReceive("receive message", msgJson, &msg)
 	if err != nil {
 		return Message{}, err
 	}

@@ -201,6 +201,12 @@ func (np *nodePool) forceNodeQuit(n *node) {
 
 //func (np *nodePool) sendMs
 
+func (np *nodePool) getLatestNetMeta() NetMeta {
+	np.netMetaMutex.RLock()
+	defer np.netMetaMutex.RUnlock()
+	return np.netMeta
+}
+
 func (np *nodePool) getLatestNetMetaJson() []byte {
 	np.netMetaMutex.RLock()
 	defer np.netMetaMutex.RUnlock()

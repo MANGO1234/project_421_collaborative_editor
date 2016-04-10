@@ -7,6 +7,7 @@ func (s *session) handleNewConn(conn net.Conn) {
 	n.logger = s.manager.logger
 	// distinguish purpose of this connection
 	purpose, err := n.readMessage()
+	n.logger.LogLocalEvent(purpose)
 	if err != nil {
 		conn.Close()
 		return
@@ -25,20 +26,22 @@ func (s *session) handleNewConn(conn net.Conn) {
 
 func (s *session) handleRegister(connWrapper *node) {
 	defer connWrapper.close()
-	latestNetMeta := s.manager.nodePool.getLatestNetMetaJson()
-	err := connWrapper.writeMessageSlice(latestNetMeta)
+	latestNetMeta := s.manager.nodePool.getLatestNetMeta()
+	err := connWrapper.writeLog(latestNetMeta)
 	if err != nil {
 		return
 	}
-	incomingNetMeta, err := connWrapper.readMessageSlice()
+	incoming := new(NetMeta)
+	err = connWrapper.readLog(incoming)
 	if err != nil {
 		return
 	}
-	incoming, err := newNetMetaFromJson(incomingNetMeta)
+	//incoming, err := newNetMetaFromJson(incomingNetMeta)
+
 	if err != nil {
 		return
 	}
-	s.manager.msgChan <- newNetMetaUpdateMsg(s.id, incoming)
+	s.manager.msgChan <- newNetMetaUpdateMsg(s.id, *incoming)
 }
 
 func (s *session) handlePoke(connWrapper *node) {

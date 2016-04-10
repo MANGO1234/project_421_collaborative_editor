@@ -133,17 +133,15 @@ func (nm *NetworkManager) ConnectTo(remoteAddr string) error {
 	if err != nil {
 		return err
 	}
-	incomingNetMeta, err := n.readMessageSlice()
+	incoming := new(NetMeta)
+	err = n.readLog(incoming)
 	if err != nil {
 		return err
 	}
-	incoming, err := newNetMetaFromJson(incomingNetMeta)
-	if err != nil {
-		return err
-	}
-	defer func() { nm.msgChan <- newNetMetaUpdateMsg(nm.id, incoming) }()
-	latestNetMeta := nm.nodePool.getLatestNetMetaJson()
-	err = n.writeMessageSlice(latestNetMeta)
+
+	defer func() { nm.msgChan <- newNetMetaUpdateMsg(nm.id, *incoming) }()
+	latestNetMeta := nm.nodePool.getLatestNetMeta()
+	err = n.writeLog(latestNetMeta)
 	if err != nil {
 		return errors.New("Partially connected: unable to send message to " +
 			"requested node, but was able to receive information.")
