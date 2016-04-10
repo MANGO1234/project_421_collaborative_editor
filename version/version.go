@@ -90,6 +90,13 @@ func NewSiteId(id string) SiteId {
 	return siteId
 }
 
+// for unrolling operationlog
+func (vector VersionVector) DecrementTo(id SiteId, i uint32) {
+	if vector[id] > i {
+		vector[id] = i
+	}
+}
+
 type VersionVectorJson map[string]uint32
 
 func (version VersionVector) ToJsonable() VersionVectorJson {

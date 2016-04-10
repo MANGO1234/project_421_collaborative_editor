@@ -32,32 +32,23 @@ func (log *OperationLog) Write(id SiteId, version uint32, operation treedoc2.Ope
 
 func (log *OperationLog) GetMissingOperations(vector version.VersionVector) []RemoteOperation {
 	result := make([]RemoteOperation, 0, 10)
-	checkDone := make(map[SiteId]bool, len(vector))
 	emptyVector := version.NewVector()
+	currentVector := vector.Copy()
 
 	for i := len(log.Log) - 1; i >= 0; i-- {
 		currentLog := log.Log[i]
-		givenVersion := vector.Get(currentLog.Id)
-		if givenVersion < currentLog.Version {
+		if vector.Get(currentLog.Id) < currentLog.Version {
 			result = append(result, RemoteOperation{
 				Vector:  emptyVector,
 				Id:      currentLog.Id,
 				Version: currentLog.Version,
 				Op:      currentLog.Operation,
 			})
-		} else {
-			checkDone[currentLog.Id] = true
 		}
+		currentVector.DecrementTo(currentLog.Id, currentLog.Version-1)
 
-		done := true
-
-		for id, _ := range vector {
-			if !checkDone[id] {
-				done = false
-			}
-		}
-
-		if done {
+		compare := currentVector.Compare(vector)
+		if compare == version.EQUAL && compare == version.LESS_THAN {
 			break
 		}
 	}

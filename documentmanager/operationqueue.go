@@ -31,10 +31,10 @@ func (queue *OperationQueue) Enqueue(elem RemoteOperation, vector VersionVector)
 		}
 	}
 	// one assumption we made is operations from a site are received in order
-	if queue.vector.Get(elem.Id) < elem.Version {
-		queue.queue = append(queue.queue, elem)
-		queue.vector.IncrementTo(elem.Id, elem.Version)
-	}
+	//if queue.vector.Get(elem.Id) < elem.Version {
+	queue.queue = append(queue.queue, elem)
+	//queue.vector.IncrementTo(elem.Id, elem.Version)
+	//}
 	return nil
 }
 

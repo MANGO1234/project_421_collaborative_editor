@@ -156,7 +156,7 @@ func TestGetMissingQueueElem(t *testing.T) {
 	q.Enqueue(RemoteOperation{Vector: NewTestVector(3, 2, 0), Id: C_ID, Version: 1}, NewTestVector(1, 0, 0))
 	assertEqual(t, 4, q.Size())
 
-	result := q.GetMissingRemoteOperations(NewTestVector(2, 2, 0))
+	result := q.GetMissingOperations(NewTestVector(2, 2, 0))
 	assertEqual(t, 3, len(result))
 	var a, b, c int
 	for _, elem := range result {
