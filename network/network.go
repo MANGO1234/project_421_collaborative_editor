@@ -49,11 +49,11 @@ func NewNetworkManager(addr string) (*NetworkManager, error) {
 func (nm *NetworkManager) serveIncomingMessages() {
 	for msg := range nm.msgChan {
 		switch msg.Type {
-		case msgTypeNetMetaUpdate:
+		case MSG_TYPE_NET_META_UPDATE:
 			nm.handleIncomingNetMeta(msg)
-		case msgTypeTreedocOp:
+		case MSG_TYPE_TREEDOC_OP:
 			nm.handleIncomingTreedocOp(msg)
-		case msgTypeVersionCheck:
+		case MSG_TYPE_VERSION_CHECK:
 			nm.handleIncomingVersionCheck(msg)
 		default:
 			// ignore and do nothing

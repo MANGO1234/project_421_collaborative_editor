@@ -3,9 +3,9 @@ package network
 import "encoding/json"
 
 const (
-	msgTypeVersionCheck  = "versioncheck" // no broadcast
-	msgTypeNetMetaUpdate = "netmeta"      // broadcast
-	msgTypeTreedocOp     = "treedocOp"    // broadcast
+	MSG_TYPE_VERSION_CHECK   = "versioncheck" // no broadcast
+	MSG_TYPE_NET_META_UPDATE = "netmeta"      // broadcast
+	MSG_TYPE_TREEDOC_OP      = "treedocOp"    // broadcast
 )
 
 // Message specifies the format of communication between nodes
@@ -16,7 +16,7 @@ type Message struct {
 	Msg     []byte
 }
 
-func newBroadcastMessage(id, msgType string, content []byte) Message {
+func NewBroadcastMessage(id, msgType string, content []byte) Message {
 	return Message{
 		msgType,
 		newVisitedNodesWithSelf(id),
@@ -25,15 +25,7 @@ func newBroadcastMessage(id, msgType string, content []byte) Message {
 }
 
 func newNetMetaUpdateMsg(id string, delta NetMeta) Message {
-	return newBroadcastMessage(id, msgTypeNetMetaUpdate, delta.toJson())
-}
-
-func newNetMetaUpdateMsgFromBytes(id string, delta []byte) Message {
-	return newBroadcastMessage(id, msgTypeNetMetaUpdate, delta)
-}
-
-func newTreedocOpBroadcastMsg(id string, content []byte) Message {
-	return newBroadcastMessage(id, msgTypeTreedocOp, content)
+	return NewBroadcastMessage(id, MSG_TYPE_NET_META_UPDATE, delta.toJson())
 }
 
 func newSyncOrCheckMessage(msgType string, content []byte) Message {

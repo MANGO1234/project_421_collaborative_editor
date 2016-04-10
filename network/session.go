@@ -156,5 +156,5 @@ func (s *session) getLatestVersionCheckMsg() Message {
 		getLatestVersionVector(),
 	}
 	content := versionCheckMsgContent.toJson()
-	return newSyncOrCheckMessage(msgTypeVersionCheck, content)
+	return newSyncOrCheckMessage(MSG_TYPE_VERSION_CHECK, content)
 }

@@ -4,6 +4,8 @@ import (
 	"../buffer"
 	. "../common"
 	"../documentmanager"
+	"../network"
+	"../treedoc2"
 	"github.com/nsf/termbox-go"
 )
 
@@ -32,4 +34,8 @@ func newDocument(siteId SiteId) *documentmanager.DocumentModel {
 	return documentmanager.NewDocumentModel(siteId, width-1, func() {
 		termbox.Interrupt()
 	})
+}
+
+func broadcastTreeDocOperation(id string) func(version uint32, operation treedoc2.Operation) {
+	return func(uint32, treedoc2.Operation) {}
 }
