@@ -108,24 +108,14 @@ func FromVersionVectorJson(json VersionVectorJson) VersionVector {
 	return newVector
 }
 
-func (version *VersionVector) MarshalJSON() ([]byte, error) {
-	newVector := make(map[string]uint32)
-	for k, v := range *version {
-		newVector[k.ToString()] = v
-	}
-	return json.Marshal(newVector)
+func (version VersionVector) MarshalJSON() []byte {
+	newVector := version.ToJsonable()
+	b, _ := json.Marshal(newVector)
+	return b
 }
 
-func (version *VersionVector) UnmarshalJSON(data []byte) error {
-	newVector := make(map[string]uint32)
-	if err := json.Unmarshal(data, &newVector); err != nil {
-		return err
-	}
-
-	for k, v := range newVector {
-		id := NewSiteId(k)
-		(*version)[id] = v
-	}
-
-	return nil
+func UnmarshalJSON(data []byte) VersionVector {
+	var newVector VersionVectorJson
+	json.Unmarshal(data, &newVector)
+	return FromVersionVectorJson(newVector)
 }

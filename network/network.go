@@ -22,8 +22,8 @@ type NetworkManager struct {
 	session  *session
 	// this is ugly and nt really good, maybe changed later once its working
 	RemoteOpHandler      func([]byte)
-	GetOpsReceiveVersion func([]byte)
-	VersionCheckHandler  func([]byte)
+	GetOpsReceiveVersion func() []byte
+	VersionCheckHandler  func([]byte) ([]byte, bool)
 }
 
 var (
@@ -43,6 +43,14 @@ func NewNetworkManager(addr string) (*NetworkManager, error) {
 	if err != nil {
 		return nil, err
 	}
+	// stubs
+	manager.SetRemoteOpHandler(func(msg []byte) {})
+	manager.SetGetOpsReceiveVersion(func() []byte {
+		return nil
+	})
+	manager.SetVersionCheckHandler(func(data []byte) ([]byte, bool) {
+		return nil, false
+	})
 	return &manager, nil
 }
 
@@ -137,14 +145,10 @@ func (nm *NetworkManager) SetRemoteOpHandler(fn func([]byte)) {
 	nm.RemoteOpHandler = fn
 }
 
-func (nm *NetworkManager) RemoveRemoteOpHandler() {
-	nm.RemoteOpHandler = nil
-}
-
-func (nm *NetworkManager) SetVersionCheckHandler(fn func([]byte)) {
+func (nm *NetworkManager) SetVersionCheckHandler(fn func([]byte) ([]byte, bool)) {
 	nm.VersionCheckHandler = fn
 }
 
-func (nm *NetworkManager) RemoveVersionCheckHandler() {
-	nm.VersionCheckHandler = nil
+func (nm *NetworkManager) SetGetOpsReceiveVersion(fn func() []byte) {
+	nm.GetOpsReceiveVersion = fn
 }

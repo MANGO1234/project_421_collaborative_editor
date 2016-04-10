@@ -130,7 +130,11 @@ func (s *session) connect(n *node) bool {
 		if err != nil {
 			return false
 		}
-		err = n.sendMessage(s.getLatestVersionCheckMsg())
+
+		hasMsg, msg := s.getLatestVersionCheckMsg()
+		if hasMsg {
+			err = n.sendMessage(msg)
+		}
 		if err != nil {
 			return false
 		}

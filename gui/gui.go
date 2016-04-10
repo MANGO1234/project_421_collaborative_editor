@@ -128,6 +128,16 @@ func StartMainLoop(manager *network.NetworkManager) {
 			appState.DocModel.ApplyRemoteOperation(documentmanager.RemoteOperationFromSlice(msg))
 		}
 	})
+	appState.Manager.SetGetOpsReceiveVersion(func() []byte {
+		if appState.DocModel != nil {
+			return appState.DocModel.GetVersionVectorReceived().MarshalJSON()
+		} else {
+			return nil
+		}
+	})
+	appState.Manager.SetVersionCheckHandler(func(data []byte) ([]byte, bool) {
+		return nil, false
+	})
 	for {
 		if appState.State == STATE_EXIT {
 			appState.Manager.Disconnect()

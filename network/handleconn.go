@@ -94,7 +94,10 @@ func (s *session) handleConnect(connWrapper *node) {
 	if err != nil {
 		return
 	}
-	err = connWrapper.sendMessage(s.getLatestVersionCheckMsg())
+	hasMsg, msg := s.getLatestVersionCheckMsg()
+	if hasMsg {
+		err = connWrapper.sendMessage(msg)
+	}
 	if err != nil {
 		return
 	}

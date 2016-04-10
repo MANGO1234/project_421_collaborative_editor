@@ -106,7 +106,7 @@ func (s *session) handleIncomingVersionCheck(msg Message) {
 		return
 	}
 	s.handleIncomingNetMeta(newNetMetaUpdateMsg(s.id, content.NetworkMeta))
-	syncInfo, shouldReply := stubGetSyncInfoToReply(content.VersionVector)
+	syncInfo, shouldReply := s.manager.VersionCheckHandler(content.VersionVector)
 	if shouldReply {
 		toSend := NewBroadcastMessage(s.id, MSG_TYPE_SYNC, syncInfo)
 		go func() {
@@ -139,27 +139,27 @@ func (s *session) handleNewNodes(nodes []*node) {
 func (s *session) periodicallyCheckVersion() {
 	for {
 		time.Sleep(versionCheckInterval)
-		msg := s.getLatestVersionCheckMsg()
+		hasMsg, msg := s.getLatestVersionCheckMsg()
 		if s.ended() {
 			return
 		}
-		s.manager.nodePool.broadcast(msg)
+		if hasMsg {
+			s.manager.nodePool.broadcast(msg)
+		}
 	}
 }
 
-func getLatestVersionVector() []byte {
-	// TODO: this should retrieve the latest version vector for treedoc
-	//       from somewhere
-	return nil
-}
-
-func (s *session) getLatestVersionCheckMsg() Message {
-	latestMeta := s.manager.nodePool.getLatestNetMetaCopy()
-	versionCheckMsgContent := VersionCheckMsgContent{
-		s.id,
-		latestMeta,
-		getLatestVersionVector(),
+func (s *session) getLatestVersionCheckMsg() (bool, Message) {
+	slice := s.manager.GetOpsReceiveVersion()
+	if slice != nil {
+		latestMeta := s.manager.nodePool.getLatestNetMetaCopy()
+		versionCheckMsgContent := VersionCheckMsgContent{
+			s.id,
+			latestMeta,
+			slice,
+		}
+		content := versionCheckMsgContent.toJson()
+		return true, newSyncOrCheckMessage(MSG_TYPE_VERSION_CHECK, content)
 	}
-	content := versionCheckMsgContent.toJson()
-	return newSyncOrCheckMessage(MSG_TYPE_VERSION_CHECK, content)
+	return false, Message{}
 }
