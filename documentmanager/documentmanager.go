@@ -131,6 +131,6 @@ func (model *DocumentModel) HandleVersionVector(vector version.VersionVector) {
 	compare := myVec.Compare(vector)
 	if compare == version.GREATER_THAN || compare == version.CONFLICT {
 		//ops := model.Log.GetMissingOperations(vector)
-		//queueOps := model.Queue.GetMissingRemoteOperations(vector)
+		//queueOps := model.Queue.GetMissingOperations(vector)
 	}
 }

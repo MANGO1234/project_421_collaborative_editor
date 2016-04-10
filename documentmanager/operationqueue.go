@@ -61,7 +61,7 @@ func dequeHelper(result []RemoteOperation, queue *OperationQueue, upto int, vect
 	return result, offset
 }
 
-func (queue *OperationQueue) GetMissingRemoteOperations(vector VersionVector) []RemoteOperation {
+func (queue *OperationQueue) GetMissingOperations(vector VersionVector) []RemoteOperation {
 	q := queue.queue
 	result := make([]RemoteOperation, 0)
 	for i := 0; i < len(q); i++ {
