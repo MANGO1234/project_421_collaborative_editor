@@ -88,6 +88,7 @@ func (s *session) listenForNewConn() {
 
 func (s *session) handleNewNodes(nodes []*node) {
 	for _, n := range nodes {
+		n.logger = s.manager.logger
 		s.initiateNewNode(n)
 	}
 }

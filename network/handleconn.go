@@ -4,6 +4,7 @@ import "net"
 
 func (s *session) handleNewConn(conn net.Conn) {
 	n := newConnWrapper(conn)
+	n.logger = s.manager.logger
 	// distinguish purpose of this connection
 	purpose, err := n.readMessage()
 	if err != nil {

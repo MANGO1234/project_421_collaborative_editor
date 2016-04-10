@@ -5,6 +5,7 @@ import (
 	"net"
 	"sync"
 	"time"
+	"github.com/arcaneiceman/GoVector/govec"
 )
 
 // node state
@@ -26,6 +27,7 @@ type node struct {
 	reader     *util.MessageReader
 	writer     *util.MessageWriter
 	interval   time.Duration // current interval to reconnect
+	logger	   *govec.GoLog
 }
 
 type nodePool struct {
