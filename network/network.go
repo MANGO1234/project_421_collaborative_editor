@@ -33,8 +33,8 @@ var (
 func NewNetworkManager(addr string) (*NetworkManager, error) {
 	manager := NetworkManager{
 		addr:          addr,
-		msgChan:       make(chan Message),
-		broadcastChan: make(chan Message, 15),
+		msgChan:       make(chan Message, 10000),
+		broadcastChan: make(chan Message, 10000),
 		nodePool:      newNodePool(),
 	}
 	err := startNewSessionOnNetworkManager(&manager)
@@ -46,7 +46,6 @@ func NewNetworkManager(addr string) (*NetworkManager, error) {
 	return &manager, nil
 }
 
-// TODO: De said to reduce this and merge things together
 func (nm *NetworkManager) serveIncomingMessages() {
 	for msg := range nm.msgChan {
 		switch msg.Type {
@@ -56,17 +55,10 @@ func (nm *NetworkManager) serveIncomingMessages() {
 			nm.handleIncomingTreedocOp(msg)
 		case msgTypeVersionCheck:
 			nm.handleIncomingVersionCheck(msg)
-		case msgTypeSync:
-			// TODO: give this to treedoc manager
-			stubApplySyncInfo(msg.Msg)
 		default:
 			// ignore and do nothing
 		}
 	}
-}
-
-func TODO(sth interface{}) {
-
 }
 
 func (nm *NetworkManager) handleIncomingNetMeta(msg Message) {
@@ -107,18 +99,6 @@ func (nm *NetworkManager) handleIncomingVersionCheck(msg Message) {
 		return
 	}
 	nm.handleIncomingNetMeta(newNetMetaUpdateMsg(nm.session.id, content.NetworkMeta))
-	syncInfo, shouldReply := stubGetSyncInfoToReply(content.VersionVector)
-	if shouldReply {
-		toSend := newSyncMessage(syncInfo)
-		s := nm.session
-		go func() {
-			s.sendMessageToNodeWithId(toSend, content.Source)
-		}()
-	}
-}
-
-func stubApplySyncInfo(syncInfo []byte) {
-	// TODO remove this
 }
 
 func (nm *NetworkManager) serveBroadcastRequests() {

@@ -10,29 +10,32 @@ import (
 
 type DocumentModel struct {
 	sync.RWMutex
-	OwnerId     SiteId
-	OpVersion   uint32
-	NodeIdClock uint32
-	Treedoc     *treedoc2.Document
-	Buffer      *buffer.Buffer
-	Log         *OperationLog
-	Queue       *OperationQueue
-	UpdateGUI   func()
+	OwnerId         SiteId
+	OpVersion       uint32
+	NodeIdClock     uint32
+	Treedoc         *treedoc2.Document
+	Buffer          *buffer.Buffer
+	Log             *OperationLog
+	Queue           *OperationQueue
+	UpdateGUI       func()
+	BroadcastRemote func(uint32, treedoc2.Operation)
 }
 
 func NewDocumentModel(id SiteId, width int, updateGUI func()) *DocumentModel {
 	return &DocumentModel{
-		OwnerId:   id,
-		OpVersion: 1,
-		Treedoc:   treedoc2.NewDocument(),
-		Buffer:    buffer.StringToBuffer("", width),
-		Queue:     NewQueue(),
-		Log:       NewLog(),
-		UpdateGUI: updateGUI,
+		OwnerId:         id,
+		OpVersion:       1,
+		Treedoc:         treedoc2.NewDocument(),
+		Buffer:          buffer.StringToBuffer("", width),
+		Queue:           NewQueue(),
+		Log:             NewLog(),
+		UpdateGUI:       updateGUI,
+		BroadcastRemote: func(a uint32, b treedoc2.Operation) {},
 	}
 }
 
 func (model *DocumentModel) LocalInsert(atom byte) {
+	model.Lock()
 	pos := model.Buffer.GetPosition()
 	model.Buffer.InsertAtCurrent(atom)
 	id := treedoc2.NewNodeId(model.OwnerId, model.NodeIdClock)
@@ -43,10 +46,12 @@ func (model *DocumentModel) LocalInsert(atom byte) {
 	model.Log.Write(model.OwnerId, model.OpVersion, operation)
 	model.OpVersion++
 	model.AssertEqual()
-	BroadcastOperation(model.OpVersion, operation)
+	model.Unlock()
+	go model.BroadcastRemote(model.OpVersion, operation)
 }
 
 func (model *DocumentModel) LocalBackspace() {
+	model.Lock()
 	pos := model.Buffer.GetPosition() - 1
 	if pos < 0 {
 		return
@@ -56,10 +61,12 @@ func (model *DocumentModel) LocalBackspace() {
 	model.Log.Write(model.OwnerId, model.OpVersion, operation)
 	model.OpVersion++
 	model.AssertEqual()
-	BroadcastOperation(model.OpVersion, operation)
+	model.Unlock()
+	go model.BroadcastRemote(model.OpVersion, operation)
 }
 
 func (model *DocumentModel) LocalDelete() {
+	model.Lock()
 	pos := model.Buffer.GetPosition()
 	if pos >= model.Buffer.GetSize() {
 		return
@@ -69,10 +76,12 @@ func (model *DocumentModel) LocalDelete() {
 	model.Log.Write(model.OwnerId, model.OpVersion, operation)
 	model.OpVersion++
 	model.AssertEqual()
-	BroadcastOperation(model.OpVersion, operation)
+	model.Unlock()
+	go model.BroadcastRemote(model.OpVersion, operation)
 }
 
 func (model *DocumentModel) RemoteOperation(vector version.VersionVector, id SiteId, opVersion uint32, operation treedoc2.Operation) {
+	model.Lock()
 	queueElems := model.Queue.Enqueue(QueueElem{
 		Vector:    vector,
 		Id:        id,
@@ -85,6 +94,7 @@ func (model *DocumentModel) RemoteOperation(vector version.VersionVector, id Sit
 		model.Log.Write(elem.Id, elem.Version, elem.Operation)
 		model.AssertEqual()
 	}
+	model.Unlock()
 	model.UpdateGUI()
 }
 
@@ -94,6 +104,10 @@ func (model *DocumentModel) AssertEqual() {
 	}
 }
 
-func BroadcastOperation(operationVersion uint32, operation treedoc2.Operation) {
+func (model *DocumentModel) SetBroadcastRemote(fn func(uint32, treedoc2.Operation)) {
+	model.BroadcastRemote = fn
+}
 
+func (model *DocumentModel) RemoveBroadcastRemote() {
+	model.BroadcastRemote = func(a uint32, b treedoc2.Operation) {}
 }

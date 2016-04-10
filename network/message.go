@@ -2,17 +2,11 @@ package network
 
 import "encoding/json"
 
-// message types of messages sent to existing connection
 const (
 	msgTypeVersionCheck  = "versioncheck" // no broadcast
-	msgTypeSync          = "sync"         // no broadcast
 	msgTypeNetMetaUpdate = "netmeta"      // broadcast
 	msgTypeTreedocOp     = "treedocOp"    // broadcast
 )
-
-// TODO: for convenience, we are passing json around with possibly
-// layers of mappings. This is inefficient. Should improve on this
-// if we have time
 
 // Message specifies the format of communication between nodes
 // after connection establishes
@@ -50,10 +44,6 @@ func newSyncOrCheckMessage(msgType string, content []byte) Message {
 	}
 }
 
-func newSyncMessage(content []byte) Message {
-	return newSyncOrCheckMessage(msgTypeSync, content)
-}
-
 type VersionCheckMsgContent struct {
 	Source        string
 	NetworkMeta   NetMeta
@@ -70,11 +60,6 @@ func (content VersionCheckMsgContent) toJson() []byte {
 	contentJson, _ := json.Marshal(content)
 	return contentJson
 }
-
-//func newVersionCheckMsg(netMeta NetMeta, content []byte) Message {
-//	msgContent := VersionCheckMsgContent{netMeta, content}
-//	return newSyncOrCheckMessage(msgTypeVersionCheck, msgContent.toJson())
-//}
 
 func (msg *Message) toJson() []byte {
 	msgJson, _ := json.Marshal(msg)
