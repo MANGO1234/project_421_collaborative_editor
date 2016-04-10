@@ -143,10 +143,11 @@ func StartMainLoop(manager *network.NetworkManager) {
 		err, vector := version.UnmarshalJSON(data)
 		if appState.DocModel != nil && err == nil {
 			ops, queueOps := appState.DocModel.GetMissingOperations(vector)
-			fmt.Println()
+			ops = append(ops, queueOps...)
+			fmt.Println("****************************")
 			fmt.Println(ops)
 			fmt.Println(queueOps)
-			return nil, false
+			return documentmanager.RemoteOperationsToSlice(ops), false
 		} else {
 			return nil, false
 		}
