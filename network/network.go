@@ -204,3 +204,7 @@ func (nm *NetworkManager) BroadcastAsync(msg Message) {
 func (nm *NetworkManager) GetNetworkMetadata() string {
 	return string(nm.nodePool.getLatestNetMetaJsonPrettyPrint())
 }
+
+func (nm *NetworkManager) GetNodePool() *nodePool {
+	return nm.nodePool
+}
