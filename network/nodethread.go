@@ -170,7 +170,7 @@ func (s *session) receiveThread(n *node) {
 }
 
 func (s *session) sendThread(sendWrapper *node) {
-	for {
+	for done := false; !done || len(sendWrapper.outChan) > 0; {
 		select {
 		case msg := <-sendWrapper.outChan:
 			err := sendWrapper.sendMessage(msg)
@@ -179,13 +179,10 @@ func (s *session) sendThread(sendWrapper *node) {
 				sendWrapper.outChan <- msg
 				return
 			}
-		default:
-			select {
-			case <-s.done:
-				sendWrapper.sendMessage(newNetMetaUpdateMsg(s.id, newQuitNetMeta(s.id, s.manager.addr)))
-				sendWrapper.close()
-			default:
-			}
+		case <-s.done:
+			done = true
 		}
 	}
+	sendWrapper.sendMessage(newNetMetaUpdateMsg(s.id, newQuitNetMeta(s.id, s.manager.addr)))
+	sendWrapper.close()
 }

@@ -34,6 +34,7 @@ func startNewSessionOnNetworkManager(nm *NetworkManager) error {
 	nm.nodePool.handleNewSession(&newSession)
 	go newSession.listenForNewConn()
 	go newSession.periodicallyCheckVersion()
+	go newSession.serveIncomingMessages()
 	nm.id = newSession.id
 	nm.session = &newSession
 	return nil
@@ -51,6 +52,66 @@ func (s *session) ended() bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func (s *session) serveIncomingMessages() {
+	for done := false; !done || len(s.manager.msgChan) > 0; {
+		select {
+		case msg := <-s.manager.msgChan:
+			switch msg.Type {
+			case MSG_TYPE_NET_META_UPDATE:
+				s.handleIncomingNetMeta(msg)
+			case MSG_TYPE_TREEDOC_OP:
+				s.handleIncomingTreedocOp(msg)
+			case MSG_TYPE_VERSION_CHECK:
+				s.handleIncomingVersionCheck(msg)
+			default:
+				// ignore and do nothing
+			}
+		case <-s.done:
+			done = true
+		}
+	}
+}
+
+func (s *session) handleIncomingNetMeta(msg Message) {
+	updates, err := newNetMetaFromJson(msg.Msg)
+	if err != nil {
+		return
+	}
+	newNodes, deltaNetMeta, changed := s.manager.nodePool.applyReceivedUpdates(updates)
+	if changed {
+		s.handleNewNodes(newNodes)
+		msg.Msg = deltaNetMeta.toJson()
+		s.manager.nodePool.broadcast(msg)
+	}
+}
+
+func (s *session) handleIncomingTreedocOp(msg Message) {
+	if s.manager.TreeDocHandler != nil {
+		s.manager.TreeDocHandler(msg.Msg)
+	}
+	s.manager.nodePool.broadcast(msg)
+}
+
+func stubGetSyncInfoToReply(versionVector []byte) ([]byte, bool) {
+	// TODO remove this
+	return nil, false
+}
+
+func (s *session) handleIncomingVersionCheck(msg Message) {
+	content, err := newVersionCheckMsgContentFromJson(msg.Msg)
+	if err != nil {
+		return
+	}
+	s.handleIncomingNetMeta(newNetMetaUpdateMsg(s.id, content.NetworkMeta))
+	syncInfo, shouldReply := stubGetSyncInfoToReply(content.VersionVector)
+	if shouldReply {
+		toSend := NewBroadcastMessage(s.id, MSG_TYPE_SYNC, syncInfo)
+		go func() {
+			s.manager.nodePool.sendMessageToNodeWithId(toSend, content.Source)
+		}()
 	}
 }
 
