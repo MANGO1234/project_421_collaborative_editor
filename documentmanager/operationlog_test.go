@@ -1,14 +1,9 @@
 package documentmanager
 
 import (
-	. "../common"
 	"../treedoc2"
 	"testing"
 )
-
-var A_ID = StringToSiteId("aaaaaaaaaaaaaaaa")
-var B_ID = StringToSiteId("bbbbbbbbbbbbbbbb")
-var C_ID = StringToSiteId("cccccccccccccccc")
 
 func TestGetMissingOperations(t *testing.T) {
 	log := NewLog()

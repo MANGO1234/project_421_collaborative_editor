@@ -145,11 +145,11 @@ func TestEnqueueDuplicateOperations(t *testing.T) {
 
 func TestGetMissingQueueElem(t *testing.T) {
 	q := NewQueue()
-	q.Enqueue(QueueElem{Vector: NewTestVector(0, 0, 0), Id: A_ID, Version: 1})
-	q.Enqueue(QueueElem{Vector: NewTestVector(1, 1, 0), Id: B_ID, Version: 2})
-	q.Enqueue(QueueElem{Vector: NewTestVector(2, 0, 0), Id: A_ID, Version: 3})
-	q.Enqueue(QueueElem{Vector: NewTestVector(3, 0, 0), Id: A_ID, Version: 4})
-	q.Enqueue(QueueElem{Vector: NewTestVector(3, 2, 0), Id: C_ID, Version: 1})
+	q.Enqueue(QueueElem{Vector: NewTestVector(0, 0, 0), Id: A_ID, Version: 1}, NewTestVector(0, 0, 0))
+	q.Enqueue(QueueElem{Vector: NewTestVector(1, 1, 0), Id: B_ID, Version: 2}, NewTestVector(1, 0, 0))
+	q.Enqueue(QueueElem{Vector: NewTestVector(2, 0, 0), Id: A_ID, Version: 3}, NewTestVector(1, 0, 0))
+	q.Enqueue(QueueElem{Vector: NewTestVector(3, 0, 0), Id: A_ID, Version: 4}, NewTestVector(1, 0, 0))
+	q.Enqueue(QueueElem{Vector: NewTestVector(3, 2, 0), Id: C_ID, Version: 1}, NewTestVector(1, 0, 0))
 	assertEqual(t, 4, q.Size())
 
 	result := q.GetMissingQueueElem(NewTestVector(2, 2, 0))
