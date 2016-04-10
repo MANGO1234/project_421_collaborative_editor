@@ -26,6 +26,9 @@ func DrawPrompt(prompt *buffer.Prompt) error {
 			case termbox.KeyCtrlC:
 				appState.State = STATE_EXIT
 				return nil
+			case termbox.KeyCtrlK:
+				termbox.Close()
+				panic("Force kill")
 			case termbox.KeyEsc:
 				if appState.DocModel != nil {
 					appState.State = STATE_DOCUMENT
@@ -56,6 +59,7 @@ func DrawPrompt(prompt *buffer.Prompt) error {
 		case termbox.EventInterrupt:
 			redrawPrompt(prompt, width, height)
 		case termbox.EventError:
+			termbox.Close()
 			panic(ev.Err)
 		}
 	}

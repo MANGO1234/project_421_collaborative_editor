@@ -28,6 +28,9 @@ func DrawEditor() {
 			case termbox.KeyCtrlC:
 				appState.State = STATE_EXIT
 				return
+			case termbox.KeyCtrlK:
+				termbox.Close()
+				panic("Force kill")
 			case termbox.KeyEsc:
 				appState.State = STATE_MENU
 				return
@@ -76,6 +79,7 @@ func DrawEditor() {
 			// remote operations
 			appState.ScreenY = redrawEditor(appState.ScreenY, height)
 		case termbox.EventError:
+			termbox.Close()
 			panic(ev.Err)
 		}
 	}

@@ -131,6 +131,7 @@ func StartMainLoop(manager *network.NetworkManager) {
 	})
 	for {
 		if appState.State == STATE_EXIT {
+			appState.Manager.Disconnect()
 			break
 		}
 		if appState.State == STATE_DOCUMENT {
