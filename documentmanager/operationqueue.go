@@ -26,23 +26,15 @@ func (queue *OperationQueue) Size() int {
 	return len(queue.queue)
 }
 
-func (queue *OperationQueue) Vector() VersionVector {
-	return queue.vector.Copy()
-}
-
-func (queue *OperationQueue) IncrementVector(id SiteId, versionNum uint32) {
-	queue.vector.IncrementTo(id, versionNum)
-}
-
 // enqueue an operation and returns list of operation that's ready
-func (queue *OperationQueue) Enqueue(elem QueueElem) []QueueElem {
-	if queue.vector.Get(elem.Id) == elem.Version-1 {
-		compare := queue.vector.Compare(elem.Vector)
+func (queue *OperationQueue) Enqueue(elem QueueElem, vector VersionVector) []QueueElem {
+	if vector.Get(elem.Id) == elem.Version-1 {
+		compare := vector.Compare(elem.Vector)
 		if compare == GREATER_THAN || compare == EQUAL {
 			result := make([]QueueElem, 1, 4)
-			queue.vector.Increment(elem.Id)
+			vector.Increment(elem.Id)
 			result[0] = elem
-			result, offset := dequeHelper(result, queue, len(queue.queue))
+			result, offset := dequeHelper(result, queue, len(queue.queue), vector)
 			queue.queue = queue.queue[:len(queue.queue)-offset]
 			return result
 		}
@@ -51,9 +43,9 @@ func (queue *OperationQueue) Enqueue(elem QueueElem) []QueueElem {
 	return nil
 }
 
-func dequeHelper(result []QueueElem, queue *OperationQueue, upto int) ([]QueueElem, int) {
+func dequeHelper(result []QueueElem, queue *OperationQueue, upto int, vector VersionVector) ([]QueueElem, int) {
 	q := queue.queue
-	v := queue.vector
+	v := vector
 	offset := 0
 	for i := 0; i < upto; i++ {
 		if offset != 0 {
@@ -69,7 +61,7 @@ func dequeHelper(result []QueueElem, queue *OperationQueue, upto int) ([]QueueEl
 			v.Increment(q[i].Id)
 			result = append(result, q[i])
 			var offsetp int
-			result, offsetp = dequeHelper(result, queue, i-offset)
+			result, offsetp = dequeHelper(result, queue, i-offset, vector)
 			offset += offsetp + 1
 		}
 	}

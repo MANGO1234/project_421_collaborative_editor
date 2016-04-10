@@ -7,6 +7,7 @@ import (
 	"../network"
 	"fmt"
 	"github.com/nsf/termbox-go"
+	"github.com/satori/go.uuid"
 	"strconv"
 )
 
@@ -52,7 +53,8 @@ func doAction(input string) {
 				appState.TempData = err
 			}
 		} else if appState.MenuOptions[n-1] == OPTION_NEW_DOCUMENT {
-			appState.DocModel = newDocument(StringToSiteId("aaaaaaaaaaaaaaaa"))
+			appState.DocModel = newDocument(StringToSiteId(uuid.NewV1().String()))
+			appState.DocModel.SetBroadcastRemote(broadcastTreeDocOperation)
 			appState.ScreenY = 0
 			appState.State = STATE_DOCUMENT
 		} else if appState.MenuOptions[n-1] == OPTION_CLOSE_DOCUMENT {
@@ -76,14 +78,14 @@ func doAction(input string) {
 func getPrompt() *buffer.Prompt {
 	if appState.State == STATE_MENU || appState.State == STATE_MENU_RETRY {
 		options := make([]string, 0, 10)
-		options = append(options, OPTION_EXIT)
-		options = append(options, OPTION_CONNECT)
-		options = append(options, OPTION_DISCONNECT)
 		if appState.DocModel == nil {
 			options = append(options, OPTION_NEW_DOCUMENT)
 		} else {
+			options = append(options, OPTION_CONNECT)
+			options = append(options, OPTION_DISCONNECT)
 			options = append(options, OPTION_CLOSE_DOCUMENT)
 		}
+		options = append(options, OPTION_EXIT)
 		appState.MenuOptions = options
 
 		str := ""
@@ -122,6 +124,11 @@ func StartMainLoop(manager *network.NetworkManager) {
 
 	appState.State = STATE_MENU
 	appState.Manager = manager
+	appState.Manager.SetTreeDocHandler(func(msg []byte) {
+		if appState.DocModel != nil {
+			appState.DocModel.ApplyRemoteOperation(documentmanager.RemoteOperationFromSlice(msg))
+		}
+	})
 	for {
 		if appState.State == STATE_EXIT {
 			break
