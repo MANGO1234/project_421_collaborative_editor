@@ -4,7 +4,7 @@ import (
 	"../buffer"
 	. "../common"
 	"../documentmanager"
-	"../treedoc2"
+	"../network"
 	"github.com/nsf/termbox-go"
 )
 
@@ -35,6 +35,9 @@ func newDocument(siteId SiteId) *documentmanager.DocumentModel {
 	})
 }
 
-func broadcastTreeDocOperation(id string) func(version uint32, operation treedoc2.Operation) {
-	return func(uint32, treedoc2.Operation) {}
+func broadcastTreeDocOperation(op documentmanager.RemoteOperation) {
+	appState.Manager.Broadcast(network.NewBroadcastMessage(
+		appState.Manager.GetCurrentId(),
+		network.MSG_TYPE_TREEDOC_OP,
+		documentmanager.RemoteOperationToSlice(op)))
 }

@@ -15,11 +15,12 @@ import (
 )
 
 type NetworkManager struct {
-	id       string
-	addr     string
-	msgChan  chan Message
-	nodePool *nodePool
-	session  *session
+	id             string
+	addr           string
+	msgChan        chan Message
+	nodePool       *nodePool
+	session        *session
+	TreeDocHandler func([]byte)
 }
 
 var (
@@ -71,18 +72,11 @@ func (nm *NetworkManager) handleIncomingNetMeta(msg Message) {
 	}
 }
 
-func stubGetTreedocOpToPassOn(treedocOpPackage []byte) ([]byte, bool) {
-	// TODO remove this
-	return nil, false
-}
-
 func (nm *NetworkManager) handleIncomingTreedocOp(msg Message) {
-	// get what should be broadcasted out from treedoc
-	delta, changed := stubGetTreedocOpToPassOn(msg.Msg)
-	if changed {
-		msg.Msg = delta
-		nm.Broadcast(msg)
+	if nm.TreeDocHandler != nil {
+		nm.TreeDocHandler(msg.Msg)
 	}
+	nm.Broadcast(msg)
 }
 
 func stubGetSyncInfoToReply(versionVector []byte) ([]byte, bool) {
@@ -183,4 +177,12 @@ func (nm *NetworkManager) GetNetworkMetadata() string {
 
 func (nm *NetworkManager) GetNodePool() *nodePool {
 	return nm.nodePool
+}
+
+func (nm *NetworkManager) SetTreeDocHandler(fn func([]byte)) {
+	nm.TreeDocHandler = fn
+}
+
+func (nm *NetworkManager) RemoveTreeDocHandler() {
+	nm.TreeDocHandler = nil
 }

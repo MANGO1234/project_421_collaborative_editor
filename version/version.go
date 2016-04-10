@@ -90,6 +90,24 @@ func NewSiteId(id string) SiteId {
 	return siteId
 }
 
+type VersionVectorJson map[string]uint32
+
+func (version VersionVector) ToJsonable() VersionVectorJson {
+	newVector := make(VersionVectorJson)
+	for k, v := range version {
+		newVector[k.ToString()] = v
+	}
+	return newVector
+}
+
+func FromVersionVectorJson(json VersionVectorJson) VersionVector {
+	newVector := make(VersionVector)
+	for k, v := range json {
+		newVector[StringToSiteId(k)] = v
+	}
+	return newVector
+}
+
 func (version *VersionVector) MarshalJSON() ([]byte, error) {
 	newVector := make(map[string]uint32)
 	for k, v := range *version {

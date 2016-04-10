@@ -197,7 +197,7 @@ func findAtomPos(pos int, acc int, atoms []Atom) (int, int) {
 // where we can immediately insert atom if possible
 func findAtomForInsertHelper(pos int, acc int, nodeId NodeId, node *DocNode, atoms []Atom) (byte, int, int) {
 	i := nextNonEmptyAtom(-1, atoms)
-	potentialInsert := EqualSiteId(nodeId, node.NodeId)
+	potentialInsert := EqualSiteIdInNodeId(nodeId, node.NodeId)
 	for i < len(atoms) {
 		if potentialInsert && acc == pos {
 			if canDoInsert(node, i, nodeId) {
@@ -239,7 +239,7 @@ func insertPosNewHelper(doc *Document, node *DocNode, n int, nodeId NodeId, ch b
 }
 
 func canDoInsert(node *DocNode, n int, nodeId NodeId) bool {
-	return node.Atoms[n].Size == 0 && node.Atoms[n].State == UNINITIALIZED && EqualSiteId(nodeId, node.NodeId) && n != MAX_ATOMS_PER_NODE
+	return node.Atoms[n].Size == 0 && node.Atoms[n].State == UNINITIALIZED && EqualSiteIdInNodeId(nodeId, node.NodeId) && n != MAX_ATOMS_PER_NODE
 }
 
 func makeAndApplyInsertOperation(doc *Document, node *DocNode, n int, ch byte) Operation {
