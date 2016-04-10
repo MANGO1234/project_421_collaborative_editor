@@ -3,7 +3,6 @@ package network
 import (
 	"github.com/satori/go.uuid"
 	"net"
-	"sync"
 	"time"
 )
 
@@ -11,7 +10,6 @@ import (
 const versionCheckInterval = 30 * time.Second
 
 type session struct {
-	sync.WaitGroup
 	id       string
 	listener *net.TCPListener
 	manager  *NetworkManager
@@ -27,7 +25,6 @@ func startNewSessionOnNetworkManager(nm *NetworkManager) error {
 	if err != nil {
 		return err
 	}
-	//util.Debug("listening on ", lAddr.String())
 	newSession := session{
 		id:       uuid.NewV1().String(),
 		listener: listener,
@@ -43,21 +40,9 @@ func startNewSessionOnNetworkManager(nm *NetworkManager) error {
 }
 
 func (s *session) end() {
-	// TODO: we need to double check this
-	// TODO: this isn't as graceful as it should be. We should wait
-	// until all pending operations and broadcasts are performed
 	close(s.done)
 	s.listener.Close()
-	delta := newQuitNetMeta(s.id, s.manager.addr)
-	// TODO wait for all pending messages to be handled
-	// TODO wait for all pending broadcast operations to complete
-	s.manager.nodePool.broadcast(newNetMetaUpdateMsg(s.id, delta))
-	s.disconnectAllConnectedNodes()
-	s.Wait()
-}
-
-func (s *session) disconnectAllConnectedNodes() {
-	// TODO
+	s.manager.nodePool.handleEndSession(s)
 }
 
 func (s *session) ended() bool {
@@ -71,8 +56,6 @@ func (s *session) ended() bool {
 
 // These functions launches major network threads
 func (s *session) listenForNewConn() {
-	s.Add(1)
-	defer s.Done()
 	for {
 		conn, err := s.listener.Accept()
 		if s.ended() {
@@ -93,14 +76,12 @@ func (s *session) handleNewNodes(nodes []*node) {
 }
 
 func (s *session) periodicallyCheckVersion() {
-	s.Add(1)
-	defer s.Done()
 	for {
 		time.Sleep(versionCheckInterval)
+		msg := s.getLatestVersionCheckMsg()
 		if s.ended() {
 			return
 		}
-		msg := s.getLatestVersionCheckMsg()
 		s.manager.nodePool.broadcast(msg)
 	}
 }

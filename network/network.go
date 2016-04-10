@@ -172,7 +172,9 @@ func (nm *NetworkManager) Reconnect() error {
 
 // Broadcast msg asynchronously return whether the msg
 func (nm *NetworkManager) Broadcast(msg Message) {
-	nm.nodePool.broadcast(msg)
+	if nm.session != nil || !nm.session.ended() {
+		nm.nodePool.broadcast(msg)
+	}
 }
 
 func (nm *NetworkManager) GetNetworkMetadata() string {

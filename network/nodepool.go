@@ -8,17 +8,20 @@ import (
 )
 
 // node state
+type NodeState int
+
 const (
-	nodeStateDisconnected = iota
+	nodeStateDisconnected NodeState = iota
 	nodeStateConnected
 	nodeStateLeft
+	nodeStateSessionEnded
 )
 
 const chanBufferSize = 30
 
 type node struct {
 	stateMutex sync.Mutex
-	state      int
+	state      NodeState
 	id         string
 	addr       string
 	outChan    chan Message
@@ -26,6 +29,24 @@ type node struct {
 	reader     *util.MessageReader
 	writer     *util.MessageWriter
 	interval   time.Duration // current interval to reconnect
+}
+
+func (n *node) setState(state NodeState) bool {
+	n.stateMutex.Lock()
+	defer n.stateMutex.Unlock()
+	switch n.state {
+	case nodeStateLeft:
+		return state == nodeStateLeft
+	case nodeStateSessionEnded:
+		if state == nodeStateLeft {
+			n.state = nodeStateLeft
+			return true
+		}
+		return state == nodeStateSessionEnded
+	default:
+		n.state = state
+		return true
+	}
 }
 
 type nodePool struct {
@@ -99,19 +120,36 @@ func (np *nodePool) handleNewSession(s *session) {
 	np.netMetaMutex.Lock()
 	np.netMeta[s.id] = NodeMeta{s.manager.addr, false}
 	np.netMetaMutex.Unlock()
+	np.poolMutex.RLock()
+	for _, n := range np.pool {
+		n.stateMutex.Lock()
+		if n.state == nodeStateSessionEnded {
+			n.state = nodeStateDisconnected
+		}
+		n.stateMutex.Unlock()
+		s.initiateNewNode(n)
+	}
+	np.poolMutex.RUnlock()
 }
 
-// func (np *nodepool) handleEndSession(s *session) {
-
-// }
+func (np *nodePool) handleEndSession(s *session) {
+	np.netMetaMutex.Lock()
+	np.netMeta[s.id] = NodeMeta{s.manager.addr, true}
+	np.netMetaMutex.Unlock()
+	np.poolMutex.RLock()
+	for _, n := range np.pool {
+		n.setState(nodeStateSessionEnded)
+	}
+	np.poolMutex.RUnlock()
+}
 
 func (np *nodePool) getConnectedNodes() []*node {
 	np.poolMutex.RLock()
 	defer np.poolMutex.RUnlock()
 	nodes := make([]*node, 0)
-	for _, v := range np.pool {
-		if v.state == nodeStateConnected {
-			nodes = append(nodes, v)
+	for _, n := range np.pool {
+		if n.state == nodeStateConnected {
+			nodes = append(nodes, n)
 		}
 	}
 	return nodes
@@ -141,21 +179,13 @@ func getNodeListFromMap(nodeMap map[string]*node) []*node {
 	return nodes
 }
 
-func (np *nodePool) disconnectAllNodes() {
-	np.poolMutex.RLock()
-	for _, n := range np.pool {
-		// TODO: check locking issues
-		// TODO: set state to left so threads working on this will stop
-		n.close()
-	}
-	np.poolMutex.RUnlock()
-}
-
 func (np *nodePool) removeNodeFromPool(id string) {
 	np.poolMutex.Lock()
 	if n, ok := np.pool[id]; ok {
-		n.state = nodeStateLeft
-		n.close()
+		n.setState(nodeStateLeft)
+		if n.conn != nil {
+			n.close()
+		}
 		delete(np.pool, id)
 	}
 	np.poolMutex.Unlock()
@@ -192,12 +222,6 @@ func (np *nodePool) applyReceivedUpdates(updates NetMeta) (nodeList []*node, del
 	}
 	return
 }
-
-func (np *nodePool) forceNodeQuit(n *node) {
-
-}
-
-//func (np *nodePool) sendMs
 
 func (np *nodePool) getLatestNetMetaJson() []byte {
 	np.netMetaMutex.RLock()

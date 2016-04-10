@@ -31,12 +31,6 @@ func (n *node) setConn(conn net.Conn) {
 	n.writer = &util.MessageWriter{bufio.NewWriter(conn)}
 }
 
-func (n *node) resetConn() {
-	n.conn = nil
-	n.reader = nil
-	n.writer = nil
-}
-
 func (n *node) close() {
 	n.conn.Close()
 }
