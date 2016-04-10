@@ -146,6 +146,7 @@ func (nm *NetworkManager) ConnectTo(remoteAddr string) error {
 		return errors.New("Partially connected: unable to send message to " +
 			"requested node, but was able to receive information.")
 	}
+	nm.logger.LogLocalEvent("connectTo fun end")
 	return nil
 }
 

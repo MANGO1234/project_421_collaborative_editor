@@ -46,6 +46,7 @@ func (s *session) poke(id, addr string) bool {
 	}
 	defer conn.Close()
 	n := newConnWrapper(conn)
+	n.logger = s.manager.logger 
 	err = n.writeMessage(dialingTypePoke)
 	if err != nil {
 		return false
@@ -100,6 +101,7 @@ func (s *session) connect(n *node) bool {
 		return false
 	}
 	n.setConn(conn)
+	n.logger = s.manager.logger 
 	defer func(err error, n *node) {
 		if err != nil {
 			n.close()
