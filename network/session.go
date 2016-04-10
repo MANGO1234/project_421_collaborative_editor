@@ -103,7 +103,7 @@ func (s *session) handleIncomingVersionCheck(msg Message) {
 	s.handleIncomingNetMeta(newNetMetaUpdateMsg(s.id, content.NetworkMeta))
 	syncInfo, shouldReply := s.manager.VersionCheckHandler(content.VersionVector)
 	if shouldReply {
-		toSend := NewBroadcastMessage(s.id, MSG_TYPE_SYNC, syncInfo)
+		toSend := NewBroadcastMessage(s.id, MSG_TYPE_REMOTE_OP, syncInfo)
 		go func() {
 			s.manager.nodePool.sendMessageToNodeWithId(toSend, content.Source)
 		}()

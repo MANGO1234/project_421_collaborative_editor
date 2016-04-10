@@ -125,7 +125,7 @@ func UnmarshalJSON(data []byte) (error, VersionVector) {
 	var newVector VersionVectorJson
 	err := json.Unmarshal(data, &newVector)
 	if err != nil {
-		return nil, FromVersionVectorJson(newVector)
+		return err, nil
 	}
-	return err, nil
+	return nil, FromVersionVectorJson(newVector)
 }
