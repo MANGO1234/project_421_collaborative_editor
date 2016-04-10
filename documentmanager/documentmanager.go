@@ -4,6 +4,8 @@ import (
 	"../buffer"
 	. "../common"
 	"../treedoc2"
+	"../version"
+	"encoding/json"
 	"fmt"
 	"sync"
 )
@@ -19,6 +21,11 @@ type DocumentModel struct {
 	Queue           *OperationQueue
 	UpdateGUI       func()
 	BroadcastRemote func(RemoteOperation)
+}
+
+type MissingOperation struct {
+	missingOp   []treedoc2.Operation
+	missingElem []QueueElem
 }
 
 func NewDocumentModel(id SiteId, width int, updateGUI func()) *DocumentModel {
@@ -128,4 +135,19 @@ func (model *DocumentModel) SetBroadcastRemote(fn func(RemoteOperation)) {
 
 func (model *DocumentModel) RemoveBroadcastRemote() {
 	model.BroadcastRemote = nil
+}
+
+func (model *DocumentModel) HandleVersionVector(vector version.VersionVector) {
+	myVec := model.Log.Vector.Copy()
+	compare := myVec.Compare(vector)
+	if compare == version.GREATER_THAN || compare == version.CONFLICT {
+		ops := model.Log.GetMissingOperations(vector)
+		queueElem := model.Queue.GetMissingQueueElem(vector)
+		SendMissingOperations(MissingOperation{missingOp: ops, missingElem: queueElem})
+	}
+}
+
+func SendMissingOperations(ops MissingOperation) {
+	json.Marshal(ops)
+	// TODO: call network to send missing operations
 }

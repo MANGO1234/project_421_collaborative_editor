@@ -142,3 +142,31 @@ func TestEnqueueDuplicateOperations(t *testing.T) {
 	assertEqual(t, 2, len(result))
 	assertEqual(t, 0, q.Size())
 }
+
+func TestGetMissingQueueElem(t *testing.T) {
+	q := NewQueue()
+	q.Enqueue(QueueElem{Vector: NewTestVector(0, 0, 0), Id: A_ID, Version: 1})
+	q.Enqueue(QueueElem{Vector: NewTestVector(1, 1, 0), Id: B_ID, Version: 2})
+	q.Enqueue(QueueElem{Vector: NewTestVector(2, 0, 0), Id: A_ID, Version: 3})
+	q.Enqueue(QueueElem{Vector: NewTestVector(3, 0, 0), Id: A_ID, Version: 4})
+	q.Enqueue(QueueElem{Vector: NewTestVector(3, 2, 0), Id: C_ID, Version: 1})
+	assertEqual(t, 4, q.Size())
+
+	result := q.GetMissingQueueElem(NewTestVector(2, 2, 0))
+	assertEqual(t, 3, len(result))
+	var a, b, c int
+	for _, elem := range result {
+		if EqualSiteId(elem.Id, A_ID) {
+			a++
+		}
+		if EqualSiteId(elem.Id, B_ID) {
+			b++
+		}
+		if EqualSiteId(elem.Id, C_ID) {
+			c++
+		}
+	}
+	assertEqual(t, 2, a)
+	assertEqual(t, 0, b)
+	assertEqual(t, 1, c)
+}

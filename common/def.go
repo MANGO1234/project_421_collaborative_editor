@@ -18,6 +18,10 @@ func StringToSiteId(id string) SiteId {
 	return b
 }
 
+func EqualSiteId(id SiteId, id2 SiteId) bool {
+	return id == id2
+}
+
 func Uint32ToBytes(num uint32) []byte {
 	newByte := make([]byte, 4)
 	binary.BigEndian.PutUint32(newByte, num)
