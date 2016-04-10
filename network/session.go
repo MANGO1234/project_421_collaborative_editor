@@ -7,7 +7,7 @@ import (
 )
 
 // how often to check if version on two nodes match
-const versionCheckInterval = 30 * time.Second
+const versionCheckInterval = 3 * time.Second
 
 type session struct {
 	id       string
@@ -62,8 +62,8 @@ func (s *session) serveIncomingMessages() {
 			switch msg.Type {
 			case MSG_TYPE_NET_META_UPDATE:
 				s.handleIncomingNetMeta(msg)
-			case MSG_TYPE_TREEDOC_OP:
-				s.handleIncomingTreedocOp(msg)
+			case MSG_TYPE_REMOTE_OP:
+				s.handleIncomingRemoteOp(msg)
 			case MSG_TYPE_VERSION_CHECK:
 				s.handleIncomingVersionCheck(msg)
 			default:
@@ -88,9 +88,9 @@ func (s *session) handleIncomingNetMeta(msg Message) {
 	}
 }
 
-func (s *session) handleIncomingTreedocOp(msg Message) {
-	if s.manager.TreeDocHandler != nil {
-		s.manager.TreeDocHandler(msg.Msg)
+func (s *session) handleIncomingRemoteOp(msg Message) {
+	if s.manager.RemoteOpHandler != nil {
+		go s.manager.RemoteOpHandler(msg.Msg)
 	}
 	s.manager.nodePool.broadcast(msg)
 }

@@ -32,12 +32,10 @@ func newDocument(siteId SiteId) *documentmanager.DocumentModel {
 	width, _ := termbox.Size()
 	return documentmanager.NewDocumentModel(siteId, width-1, func() {
 		termbox.Interrupt()
+	}, func(op documentmanager.RemoteOperation) {
+		appState.Manager.Broadcast(network.NewBroadcastMessage(
+			appState.Manager.GetCurrentId(),
+			network.MSG_TYPE_REMOTE_OP,
+			documentmanager.RemoteOperationToSlice(op)))
 	})
-}
-
-func broadcastTreeDocOperation(op documentmanager.RemoteOperation) {
-	appState.Manager.Broadcast(network.NewBroadcastMessage(
-		appState.Manager.GetCurrentId(),
-		network.MSG_TYPE_TREEDOC_OP,
-		documentmanager.RemoteOperationToSlice(op)))
 }

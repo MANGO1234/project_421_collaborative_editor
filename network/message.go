@@ -5,7 +5,7 @@ import "encoding/json"
 const (
 	MSG_TYPE_VERSION_CHECK   = "versioncheck" // no broadcast
 	MSG_TYPE_NET_META_UPDATE = "netmeta"      // broadcast
-	MSG_TYPE_TREEDOC_OP      = "treedocOp"    // broadcast
+	MSG_TYPE_REMOTE_OP       = "treedocOp"    // broadcast
 	MSG_TYPE_SYNC            = "sync"         // broadcast
 )
 

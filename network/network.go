@@ -15,12 +15,15 @@ import (
 )
 
 type NetworkManager struct {
-	id             string
-	addr           string
-	msgChan        chan Message
-	nodePool       *nodePool
-	session        *session
-	TreeDocHandler func([]byte)
+	id       string
+	addr     string
+	msgChan  chan Message
+	nodePool *nodePool
+	session  *session
+	// this is ugly and nt really good, maybe changed later once its working
+	RemoteOpHandler      func([]byte)
+	GetOpsReceiveVersion func([]byte)
+	VersionCheckHandler  func([]byte)
 }
 
 var (
@@ -130,14 +133,18 @@ func (nm *NetworkManager) GetNetworkMetadata() string {
 	return string(nm.nodePool.getLatestNetMetaJsonPrettyPrint())
 }
 
-func (nm *NetworkManager) GetNodePool() *nodePool {
-	return nm.nodePool
+func (nm *NetworkManager) SetRemoteOpHandler(fn func([]byte)) {
+	nm.RemoteOpHandler = fn
 }
 
-func (nm *NetworkManager) SetTreeDocHandler(fn func([]byte)) {
-	nm.TreeDocHandler = fn
+func (nm *NetworkManager) RemoveRemoteOpHandler() {
+	nm.RemoteOpHandler = nil
 }
 
-func (nm *NetworkManager) RemoveTreeDocHandler() {
-	nm.TreeDocHandler = nil
+func (nm *NetworkManager) SetVersionCheckHandler(fn func([]byte)) {
+	nm.VersionCheckHandler = fn
+}
+
+func (nm *NetworkManager) RemoveVersionCheckHandler() {
+	nm.VersionCheckHandler = nil
 }

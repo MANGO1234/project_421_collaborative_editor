@@ -54,7 +54,6 @@ func doAction(input string) {
 			}
 		} else if appState.MenuOptions[n-1] == OPTION_NEW_DOCUMENT {
 			appState.DocModel = newDocument(StringToSiteId(uuid.NewV1().String()))
-			appState.DocModel.SetBroadcastRemote(broadcastTreeDocOperation)
 			appState.ScreenY = 0
 			appState.State = STATE_DOCUMENT
 		} else if appState.MenuOptions[n-1] == OPTION_CLOSE_DOCUMENT {
@@ -124,7 +123,7 @@ func StartMainLoop(manager *network.NetworkManager) {
 
 	appState.State = STATE_MENU
 	appState.Manager = manager
-	appState.Manager.SetTreeDocHandler(func(msg []byte) {
+	appState.Manager.SetRemoteOpHandler(func(msg []byte) {
 		if appState.DocModel != nil {
 			appState.DocModel.ApplyRemoteOperation(documentmanager.RemoteOperationFromSlice(msg))
 		}
