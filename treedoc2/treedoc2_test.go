@@ -2,7 +2,6 @@ package treedoc2
 
 import (
 	"../buffer"
-	"bytes"
 	"reflect"
 	"runtime/debug"
 	"testing"

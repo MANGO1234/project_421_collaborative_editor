@@ -1,8 +1,32 @@
 package network
 
 import (
+	"../util"
+	"net"
 	"sync"
+	"time"
 )
+
+// node state
+const (
+	nodeStateDisconnected = iota
+	nodeStateConnected
+	nodeStateLeft
+)
+
+const chanBufferSize = 30
+
+type node struct {
+	stateMutex sync.Mutex
+	state      int
+	id         string
+	addr       string
+	outChan    chan Message
+	conn       net.Conn
+	reader     *util.MessageReader
+	writer     *util.MessageWriter
+	interval   time.Duration // current interval to reconnect
+}
 
 type nodePool struct {
 	netMetaMutex sync.RWMutex
@@ -16,6 +40,54 @@ func newNodePool() *nodePool {
 	np.netMeta = newNetMeta()
 	np.pool = make(map[string]*node)
 	return &np
+}
+
+func (np *nodePool) sendMessageToNodeWithId(msg Message, id string) {
+	if n, ok := np.getNodeWithId(id); ok {
+		putMsgOnSendingQueueOfNode(msg, n)
+	}
+}
+
+func (np *nodePool) broadcast(msg Message) {
+	if msg.Visited == nil {
+		np.broadcastOnce(msg)
+	} else {
+		np.broadcastRecursive(msg)
+	}
+}
+
+func (np *nodePool) broadcastOnce(msg Message) {
+	connected := np.getConnectedNodes()
+	for _, n := range connected {
+		putMsgOnSendingQueueOfNode(msg, n)
+	}
+}
+
+func (np *nodePool) broadcastRecursive(msg Message) {
+	connected := np.getConnectedNodes()
+	// copy visited nodes
+	original := map[string]struct{}{}
+	for id, _ := range msg.Visited {
+		original[id] = struct{}{}
+	}
+	// add connected nodes to visited
+	for _, n := range connected {
+		msg.Visited[n.id] = struct{}{}
+	}
+	for _, n := range connected {
+		if _, ok := original[n.id]; !ok {
+			putMsgOnSendingQueueOfNode(msg, n)
+		}
+	}
+}
+
+func putMsgOnSendingQueueOfNode(msg Message, n *node) {
+	// if the channel buffer is full we just drop it
+	// there's no point in sending way more than the node can handle
+	select {
+	case n.outChan <- msg:
+	default: // dumps the msg if buffer is full
+	}
 }
 
 func (np *nodePool) has(id string) bool {
@@ -82,7 +154,8 @@ func (np *nodePool) disconnectAllNodes() {
 func (np *nodePool) removeNodeFromPool(id string) {
 	np.poolMutex.Lock()
 	if n, ok := np.pool[id]; ok {
-		n.leave()
+		n.state = nodeStateLeft
+		n.close()
 		delete(np.pool, id)
 	}
 	np.poolMutex.Unlock()
@@ -92,7 +165,12 @@ func (np *nodePool) addOrGetNodeFromPool(id string, nodeMeta NodeMeta) *node {
 	np.poolMutex.Lock()
 	n, ok := np.pool[id]
 	if !ok {
-		n = newNodeFromIdNodeMeta(id, nodeMeta)
+		n = &node{
+			id:      id,
+			addr:    nodeMeta.Addr,
+			outChan: make(chan Message, chanBufferSize),
+			state:   nodeStateDisconnected,
+		}
 		np.pool[id] = n
 	}
 	np.poolMutex.Unlock()

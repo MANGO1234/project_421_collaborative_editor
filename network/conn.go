@@ -6,6 +6,25 @@ import (
 	"net"
 )
 
+// These are methods on node which acts like a connection wrapper
+// Structural wise, this is probably a misuse
+// TODO fix the structure if possible
+
+func getSendWrapperFromNode(n *node) *node {
+	return &node{
+		conn:    n.conn,
+		reader:  n.reader,
+		writer:  n.writer,
+		outChan: n.outChan,
+	}
+}
+
+func newConnWrapper(conn net.Conn) *node {
+	var n node
+	n.setConn(conn)
+	return &n
+}
+
 func (n *node) setConn(conn net.Conn) {
 	n.conn = conn
 	n.reader = &util.MessageReader{bufio.NewReader(conn)}

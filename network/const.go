@@ -1,8 +1,10 @@
 package network
 
-import "encoding/json"
+// TODO: this is used for the connection logic which is spread in network.go and nodethread.go
+// Will move the stuff in this file in somewhere that makes more sense
+// SORRY IN ADVANCE
 
-// Note on the design:
+// Note on the design of how connection between nodes are established:
 //
 // The node with smaller listening addr pokes    the node with a larger  one.
 // The node with larger  listening addr connects the node with a smaller one.
@@ -36,38 +38,3 @@ const (
 	// establish persistent connection between the nodes
 	dialingTypeConnect = "connect"
 )
-
-func (s *session) establishConnection(n *node) error {
-	msg := s.getLatestVersionCheckMsg()
-	rawMsg, _ := json.Marshal(msg)
-	err := n.writeMessageSlice(rawMsg)
-	if err != nil {
-		return err
-	}
-	addToConnectedPool(n)
-	go s.foreverRead(n)
-	return nil
-}
-
-func (s *session) foreverRead(n *node) {
-	s.Add(1)
-	defer s.Done()
-	for {
-		rawMsg, err := n.readMessageSlice()
-		if s.ended() {
-			return
-		}
-		if err != nil {
-			// TODO reconnect the node; move to disconnected pool
-			return
-		}
-		var msg Message
-		err = json.Unmarshal(rawMsg, &msg)
-		if err != nil {
-			// TODO reconnect the node; move to disconnected pool
-			//      quit the node
-			return
-		}
-		s.manager.msgChan <- msg
-	}
-}

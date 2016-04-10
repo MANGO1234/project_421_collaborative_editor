@@ -14,6 +14,8 @@ const (
 // layers of mappings. This is inefficient. Should improve on this
 // if we have time
 
+type VisitedNodes map[string]struct{}
+
 // Message specifies the format of communication between nodes
 // after connection establishes
 type Message struct {
@@ -25,21 +27,13 @@ type Message struct {
 func newBroadcastMessage(id, msgType string, content []byte) Message {
 	return Message{
 		msgType,
-		newVisitedNodesWithSelf(id),
+		map[string]struct{}{id: struct{}{}},
 		content,
 	}
 }
 
 func newNetMetaUpdateMsg(id string, delta NetMeta) Message {
 	return newBroadcastMessage(id, msgTypeNetMetaUpdate, delta.toJson())
-}
-
-func newNetMetaUpdateMsgFromBytes(id string, delta []byte) Message {
-	return newBroadcastMessage(id, msgTypeNetMetaUpdate, delta)
-}
-
-func newTreedocOpBroadcastMsg(id string, content []byte) Message {
-	return newBroadcastMessage(id, msgTypeTreedocOp, content)
 }
 
 func newSyncOrCheckMessage(msgType string, content []byte) Message {
@@ -70,11 +64,6 @@ func (content VersionCheckMsgContent) toJson() []byte {
 	contentJson, _ := json.Marshal(content)
 	return contentJson
 }
-
-//func newVersionCheckMsg(netMeta NetMeta, content []byte) Message {
-//	msgContent := VersionCheckMsgContent{netMeta, content}
-//	return newSyncOrCheckMessage(msgTypeVersionCheck, msgContent.toJson())
-//}
 
 func (msg *Message) toJson() []byte {
 	msgJson, _ := json.Marshal(msg)

@@ -7,13 +7,8 @@ import (
 	"time"
 )
 
-// how often to check version vector and network metadata in seconds
-const (
-	// how often to check if version on two nodes match
-	versionCheckInterval = 30 * time.Second
-	// how often to check whether it's time to (re)connect to disconnected nodes
-	reconnectInterval = 30 * time.Second
-)
+// how often to check if version on two nodes match
+const versionCheckInterval = 30 * time.Second
 
 type session struct {
 	sync.WaitGroup
@@ -56,7 +51,7 @@ func (s *session) end() {
 	delta := newQuitNetMeta(s.id, s.manager.addr)
 	// TODO wait for all pending messages to be handled
 	// TODO wait for all pending broadcast operations to complete
-	s.broadcast(newNetMetaUpdateMsg(s.id, delta))
+	s.manager.nodePool.broadcast(newNetMetaUpdateMsg(s.id, delta))
 	s.disconnectAllConnectedNodes()
 	s.Wait()
 }
@@ -91,38 +86,6 @@ func (s *session) listenForNewConn() {
 	}
 }
 
-func (s *session) broadcast(msg Message) {
-	if msg.Visited == nil {
-		s.broadcastOnce(msg)
-	} else {
-		s.broadcastRecursive(msg)
-	}
-}
-
-func (s *session) broadcastOnce(msg Message) {
-	connected := s.manager.nodePool.getConnectedNodes()
-	for _, n := range connected {
-		n.putOnSendingQueue(msg)
-	}
-}
-
-func (s *session) broadcastRecursive(msg Message) {
-	connected := s.manager.nodePool.getConnectedNodes()
-	original := msg.Visited.copyVisitedNodes()
-	msg.Visited.addAllFromNodeList(connected)
-	for _, n := range connected {
-		if !original.has(n.id) {
-			n.putOnSendingQueue(msg)
-		}
-	}
-}
-
-func (s *session) sendMessageToNodeWithId(msg Message, id string) {
-	if n, ok := s.manager.nodePool.getNodeWithId(id); ok {
-		n.putOnSendingQueue(msg)
-	}
-}
-
 func (s *session) handleNewNodes(nodes []*node) {
 	for _, n := range nodes {
 		s.initiateNewNode(n)
@@ -138,7 +101,7 @@ func (s *session) periodicallyCheckVersion() {
 			return
 		}
 		msg := s.getLatestVersionCheckMsg()
-		s.broadcast(msg)
+		s.manager.nodePool.broadcast(msg)
 	}
 }
 

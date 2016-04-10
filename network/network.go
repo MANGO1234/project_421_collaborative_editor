@@ -15,12 +15,11 @@ import (
 )
 
 type NetworkManager struct {
-	id            string
-	addr          string
-	msgChan       chan Message
-	broadcastChan chan Message
-	nodePool      *nodePool
-	session       *session
+	id       string
+	addr     string
+	msgChan  chan Message
+	nodePool *nodePool
+	session  *session
 }
 
 var (
@@ -32,16 +31,14 @@ var (
 // address addr to handle network operations
 func NewNetworkManager(addr string) (*NetworkManager, error) {
 	manager := NetworkManager{
-		addr:          addr,
-		msgChan:       make(chan Message),
-		broadcastChan: make(chan Message, 15),
-		nodePool:      newNodePool(),
+		addr:     addr,
+		msgChan:  make(chan Message, 30),
+		nodePool: newNodePool(),
 	}
 	err := startNewSessionOnNetworkManager(&manager)
 	if err != nil {
 		return nil, err
 	}
-	go manager.serveBroadcastRequests()
 	go manager.serveIncomingMessages()
 	return &manager, nil
 }
@@ -65,10 +62,6 @@ func (nm *NetworkManager) serveIncomingMessages() {
 	}
 }
 
-func TODO(sth interface{}) {
-
-}
-
 func (nm *NetworkManager) handleIncomingNetMeta(msg Message) {
 	updates, err := newNetMetaFromJson(msg.Msg)
 	if err != nil {
@@ -78,7 +71,7 @@ func (nm *NetworkManager) handleIncomingNetMeta(msg Message) {
 	if changed {
 		nm.session.handleNewNodes(newNodes)
 		msg.Msg = deltaNetMeta.toJson()
-		nm.BroadcastAsync(msg)
+		nm.Broadcast(msg)
 	}
 }
 
@@ -92,7 +85,7 @@ func (nm *NetworkManager) handleIncomingTreedocOp(msg Message) {
 	delta, changed := stubGetTreedocOpToPassOn(msg.Msg)
 	if changed {
 		msg.Msg = delta
-		nm.BroadcastAsync(msg)
+		nm.Broadcast(msg)
 	}
 }
 
@@ -110,21 +103,14 @@ func (nm *NetworkManager) handleIncomingVersionCheck(msg Message) {
 	syncInfo, shouldReply := stubGetSyncInfoToReply(content.VersionVector)
 	if shouldReply {
 		toSend := newSyncMessage(syncInfo)
-		s := nm.session
 		go func() {
-			s.sendMessageToNodeWithId(toSend, content.Source)
+			nm.nodePool.sendMessageToNodeWithId(toSend, content.Source)
 		}()
 	}
 }
 
 func stubApplySyncInfo(syncInfo []byte) {
 	// TODO remove this
-}
-
-func (nm *NetworkManager) serveBroadcastRequests() {
-	for msg := range nm.broadcastChan {
-		nm.session.broadcast(msg)
-	}
 }
 
 func (nm *NetworkManager) GetCurrentId() string {
@@ -192,13 +178,9 @@ func (nm *NetworkManager) Reconnect() error {
 	return startNewSessionOnNetworkManager(nm)
 }
 
-// Broadcast msg asynchronously
-func (nm *NetworkManager) BroadcastAsync(msg Message) {
-	if nm.session != nil {
-		go func() {
-			nm.broadcastChan <- msg
-		}()
-	}
+// Broadcast msg asynchronously return whether the msg
+func (nm *NetworkManager) Broadcast(msg Message) {
+	nm.nodePool.broadcast(msg)
 }
 
 func (nm *NetworkManager) GetNetworkMetadata() string {

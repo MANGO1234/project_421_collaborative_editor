@@ -132,7 +132,7 @@ func (s *session) connect(n *node) bool {
 			return false
 		}
 		n.state = nodeStateConnected
-		go s.sendThread(n.getSendWrapper())
+		go s.sendThread(getSendWrapperFromNode(n))
 		go s.receiveThread(n)
 		return true
 	} else {
@@ -145,7 +145,7 @@ func (s *session) connect(n *node) bool {
 
 func (s *session) receiveThread(n *node) {
 	for {
-		if n.state == nodeStateQuitted {
+		if n.state == nodeStateLeft {
 			return
 		}
 		msg, err := n.receiveMessage()

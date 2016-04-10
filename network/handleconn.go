@@ -103,6 +103,6 @@ func (s *session) handleConnect(connWrapper *node) {
 	n.reader = connWrapper.reader
 	n.writer = connWrapper.writer
 	n.state = nodeStateConnected
-	go s.sendThread(n.getSendWrapper())
+	go s.sendThread(getSendWrapperFromNode(n))
 	go s.receiveThread(n)
 }
