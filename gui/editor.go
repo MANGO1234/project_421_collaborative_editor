@@ -49,6 +49,9 @@ func DrawEditor() {
 			case termbox.KeyBackspace:
 				docModel.LocalBackspace()
 				appState.ScreenY = redrawEditor(appState.ScreenY, height)
+			case termbox.KeyBackspace2:
+				docModel.LocalBackspace()
+				appState.ScreenY = redrawEditor(appState.ScreenY, height)
 			case termbox.KeyDelete:
 				docModel.LocalDelete()
 				appState.ScreenY = redrawEditor(appState.ScreenY, height)
