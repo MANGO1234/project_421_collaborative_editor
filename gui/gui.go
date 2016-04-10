@@ -126,7 +126,10 @@ func StartMainLoop(manager *network.NetworkManager) {
 	appState.Manager = manager
 	appState.Manager.SetRemoteOpHandler(func(msg []byte) {
 		if appState.DocModel != nil {
-			appState.DocModel.ApplyRemoteOperation(documentmanager.RemoteOperationFromSlice(msg))
+			ops := documentmanager.RemoteOperationsFromSlice(msg)
+			for _, op := range ops {
+				appState.DocModel.ApplyRemoteOperation(op)
+			}
 		}
 	})
 	appState.Manager.SetGetOpsReceiveVersion(func() []byte {

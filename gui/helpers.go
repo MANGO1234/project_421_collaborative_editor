@@ -33,9 +33,11 @@ func newDocument(siteId SiteId) *documentmanager.DocumentModel {
 	return documentmanager.NewDocumentModel(siteId, width-1, func() {
 		termbox.Interrupt()
 	}, func(op documentmanager.RemoteOperation) {
+		ops := make([]documentmanager.RemoteOperation, 1, 1)
+		ops[0] = op
 		appState.Manager.Broadcast(network.NewBroadcastMessage(
 			appState.Manager.GetCurrentId(),
 			network.MSG_TYPE_REMOTE_OP,
-			documentmanager.RemoteOperationToSlice(op)))
+			documentmanager.RemoteOperationsToSlice(ops)))
 	})
 }

@@ -46,3 +46,32 @@ func RemoteOperationFromSlice(slice []byte) RemoteOperation {
 		Op:      opJson.Op,
 	}
 }
+
+func RemoteOperationsToSlice(ops []RemoteOperation) []byte {
+	newOps := make([]RemoteOperationJson, len(ops), len(ops))
+	for i, op := range ops {
+		newOps[i] = RemoteOperationJson{
+			Vector:  op.Vector.ToJsonable(),
+			Id:      op.Id,
+			Version: op.Version,
+			Op:      op.Op,
+		}
+	}
+	b, _ := json.Marshal(newOps)
+	return b
+}
+
+func RemoteOperationsFromSlice(slice []byte) []RemoteOperation {
+	var opsJson []RemoteOperationJson
+	json.Unmarshal(slice, &opsJson)
+	ops := make([]RemoteOperation, len(opsJson), len(opsJson))
+	for i, op := range opsJson {
+		ops[i] = RemoteOperation{
+			Vector:  version.FromVersionVectorJson(op.Vector),
+			Id:      op.Id,
+			Version: op.Version,
+			Op:      op.Op,
+		}
+	}
+	return ops
+}

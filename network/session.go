@@ -95,11 +95,6 @@ func (s *session) handleIncomingRemoteOp(msg Message) {
 	s.manager.nodePool.broadcast(msg)
 }
 
-func stubGetSyncInfoToReply(versionVector []byte) ([]byte, bool) {
-	// TODO remove this
-	return nil, false
-}
-
 func (s *session) handleIncomingVersionCheck(msg Message) {
 	content, err := newVersionCheckMsgContentFromJson(msg.Msg)
 	if err != nil {
