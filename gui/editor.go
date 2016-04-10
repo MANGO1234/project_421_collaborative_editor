@@ -28,6 +28,9 @@ func DrawEditor() {
 			case termbox.KeyCtrlC:
 				appState.State = STATE_EXIT
 				return
+			case termbox.KeyCtrlK:
+				termbox.Close()
+				panic("Force kill")
 			case termbox.KeyEsc:
 				appState.State = STATE_MENU
 				return
@@ -44,6 +47,9 @@ func DrawEditor() {
 				docModel.Buffer.MoveDown()
 				appState.ScreenY = redrawEditor(appState.ScreenY, height)
 			case termbox.KeyBackspace:
+				docModel.LocalBackspace()
+				appState.ScreenY = redrawEditor(appState.ScreenY, height)
+			case termbox.KeyBackspace2:
 				docModel.LocalBackspace()
 				appState.ScreenY = redrawEditor(appState.ScreenY, height)
 			case termbox.KeyDelete:
@@ -76,6 +82,7 @@ func DrawEditor() {
 			// remote operations
 			appState.ScreenY = redrawEditor(appState.ScreenY, height)
 		case termbox.EventError:
+			termbox.Close()
 			panic(ev.Err)
 		}
 	}

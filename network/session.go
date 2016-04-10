@@ -3,15 +3,13 @@ package network
 import (
 	"github.com/satori/go.uuid"
 	"net"
-	"sync"
 	"time"
 )
 
 // how often to check if version on two nodes match
-const versionCheckInterval = 30 * time.Second
+const versionCheckInterval = 3 * time.Second
 
 type session struct {
-	sync.WaitGroup
 	id       string
 	listener *net.TCPListener
 	manager  *NetworkManager
@@ -27,7 +25,6 @@ func startNewSessionOnNetworkManager(nm *NetworkManager) error {
 	if err != nil {
 		return err
 	}
-	//util.Debug("listening on ", lAddr.String())
 	newSession := session{
 		id:       uuid.NewV1().String(),
 		listener: listener,
@@ -37,27 +34,16 @@ func startNewSessionOnNetworkManager(nm *NetworkManager) error {
 	nm.nodePool.handleNewSession(&newSession)
 	go newSession.listenForNewConn()
 	go newSession.periodicallyCheckVersion()
+	go newSession.serveIncomingMessages()
 	nm.id = newSession.id
 	nm.session = &newSession
 	return nil
 }
 
 func (s *session) end() {
-	// TODO: we need to double check this
-	// TODO: this isn't as graceful as it should be. We should wait
-	// until all pending operations and broadcasts are performed
 	close(s.done)
 	s.listener.Close()
-	delta := newQuitNetMeta(s.id, s.manager.addr)
-	// TODO wait for all pending messages to be handled
-	// TODO wait for all pending broadcast operations to complete
-	s.manager.nodePool.broadcast(newNetMetaUpdateMsg(s.id, delta))
-	s.disconnectAllConnectedNodes()
-	s.Wait()
-}
-
-func (s *session) disconnectAllConnectedNodes() {
-	// TODO
+	s.manager.nodePool.handleEndSession(s)
 }
 
 func (s *session) ended() bool {
@@ -69,10 +55,63 @@ func (s *session) ended() bool {
 	}
 }
 
+func (s *session) serveIncomingMessages() {
+	for done := false; !done || len(s.manager.msgChan) > 0; {
+		select {
+		case msg := <-s.manager.msgChan:
+			switch msg.Type {
+			case MSG_TYPE_NET_META_UPDATE:
+				s.handleIncomingNetMeta(msg)
+			case MSG_TYPE_REMOTE_OP:
+				s.handleIncomingRemoteOp(msg)
+			case MSG_TYPE_VERSION_CHECK:
+				s.handleIncomingVersionCheck(msg)
+			default:
+				// ignore and do nothing
+			}
+		case <-s.done:
+			done = true
+		}
+	}
+}
+
+func (s *session) handleIncomingNetMeta(msg Message) {
+	updates, err := newNetMetaFromJson(msg.Msg)
+	if err != nil {
+		return
+	}
+	newNodes, deltaNetMeta, changed := s.manager.nodePool.applyReceivedUpdates(updates)
+	if changed {
+		s.handleNewNodes(newNodes)
+		msg.Msg = deltaNetMeta.toJson()
+		s.manager.nodePool.broadcast(msg)
+	}
+}
+
+func (s *session) handleIncomingRemoteOp(msg Message) {
+	if s.manager.RemoteOpHandler != nil {
+		go s.manager.RemoteOpHandler(msg.Msg)
+	}
+	s.manager.nodePool.broadcast(msg)
+}
+
+func (s *session) handleIncomingVersionCheck(msg Message) {
+	content, err := newVersionCheckMsgContentFromJson(msg.Msg)
+	if err != nil {
+		return
+	}
+	s.handleIncomingNetMeta(newNetMetaUpdateMsg(s.id, content.NetworkMeta))
+	syncInfo, shouldReply := s.manager.VersionCheckHandler(content.VersionVector)
+	if shouldReply {
+		toSend := NewBroadcastMessage(s.id, MSG_TYPE_REMOTE_OP, syncInfo)
+		go func() {
+			s.manager.nodePool.sendMessageToNodeWithId(toSend, content.Source)
+		}()
+	}
+}
+
 // These functions launches major network threads
 func (s *session) listenForNewConn() {
-	s.Add(1)
-	defer s.Done()
 	for {
 		conn, err := s.listener.Accept()
 		if s.ended() {
@@ -94,31 +133,29 @@ func (s *session) handleNewNodes(nodes []*node) {
 }
 
 func (s *session) periodicallyCheckVersion() {
-	s.Add(1)
-	defer s.Done()
 	for {
 		time.Sleep(versionCheckInterval)
+		hasMsg, msg := s.getLatestVersionCheckMsg()
 		if s.ended() {
 			return
 		}
-		msg := s.getLatestVersionCheckMsg()
-		s.manager.nodePool.broadcast(msg)
+		if hasMsg {
+			s.manager.nodePool.broadcast(msg)
+		}
 	}
 }
 
-func getLatestVersionVector() []byte {
-	// TODO: this should retrieve the latest version vector for treedoc
-	//       from somewhere
-	return nil
-}
-
-func (s *session) getLatestVersionCheckMsg() Message {
-	latestMeta := s.manager.nodePool.getLatestNetMetaCopy()
-	versionCheckMsgContent := VersionCheckMsgContent{
-		s.id,
-		latestMeta,
-		getLatestVersionVector(),
+func (s *session) getLatestVersionCheckMsg() (bool, Message) {
+	slice := s.manager.GetOpsReceiveVersion()
+	if slice != nil {
+		latestMeta := s.manager.nodePool.getLatestNetMetaCopy()
+		versionCheckMsgContent := VersionCheckMsgContent{
+			s.id,
+			latestMeta,
+			slice,
+		}
+		content := versionCheckMsgContent.toJson()
+		return true, newSyncOrCheckMessage(MSG_TYPE_VERSION_CHECK, content)
 	}
-	content := versionCheckMsgContent.toJson()
-	return newSyncOrCheckMessage(MSG_TYPE_VERSION_CHECK, content)
+	return false, Message{}
 }

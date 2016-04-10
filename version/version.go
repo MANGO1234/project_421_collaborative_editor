@@ -90,6 +90,13 @@ func NewSiteId(id string) SiteId {
 	return siteId
 }
 
+// for unrolling operationlog
+func (vector VersionVector) DecrementTo(id SiteId, i uint32) {
+	if vector[id] > i {
+		vector[id] = i
+	}
+}
+
 type VersionVectorJson map[string]uint32
 
 func (version VersionVector) ToJsonable() VersionVectorJson {
@@ -108,24 +115,17 @@ func FromVersionVectorJson(json VersionVectorJson) VersionVector {
 	return newVector
 }
 
-func (version *VersionVector) MarshalJSON() ([]byte, error) {
-	newVector := make(map[string]uint32)
-	for k, v := range *version {
-		newVector[k.ToString()] = v
-	}
-	return json.Marshal(newVector)
+func (version VersionVector) MarshalJSON() []byte {
+	newVector := version.ToJsonable()
+	b, _ := json.Marshal(newVector)
+	return b
 }
 
-func (version *VersionVector) UnmarshalJSON(data []byte) error {
-	newVector := make(map[string]uint32)
-	if err := json.Unmarshal(data, &newVector); err != nil {
-		return err
+func UnmarshalJSON(data []byte) (error, VersionVector) {
+	var newVector VersionVectorJson
+	err := json.Unmarshal(data, &newVector)
+	if err != nil {
+		return err, nil
 	}
-
-	for k, v := range newVector {
-		id := NewSiteId(k)
-		(*version)[id] = v
-	}
-
-	return nil
+	return nil, FromVersionVectorJson(newVector)
 }

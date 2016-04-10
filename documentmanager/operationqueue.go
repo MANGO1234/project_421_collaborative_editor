@@ -30,7 +30,11 @@ func (queue *OperationQueue) Enqueue(elem RemoteOperation, vector VersionVector)
 			return result
 		}
 	}
+	// one assumption we made is operations from a site are received in order
+	//if queue.vector.Get(elem.Id) < elem.Version {
 	queue.queue = append(queue.queue, elem)
+	//queue.vector.IncrementTo(elem.Id, elem.Version)
+	//}
 	return nil
 }
 
@@ -59,7 +63,7 @@ func dequeHelper(result []RemoteOperation, queue *OperationQueue, upto int, vect
 	return result, offset
 }
 
-func (queue *OperationQueue) GetMissingRemoteOperations(vector VersionVector) []RemoteOperation {
+func (queue *OperationQueue) GetMissingOperations(vector VersionVector) []RemoteOperation {
 	q := queue.queue
 	result := make([]RemoteOperation, 0)
 	for i := 0; i < len(q); i++ {

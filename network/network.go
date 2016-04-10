@@ -24,6 +24,12 @@ type NetworkManager struct {
 	session        *session
 	TreeDocHandler func([]byte)
 	logger		   *govec.GoLog
+
+	// this is ugly and nt really good, maybe changed later once its working
+	RemoteOpHandler      func([]byte)
+	GetOpsReceiveVersion func() []byte
+	VersionCheckHandler  func([]byte) ([]byte, bool)
+
 }
 
 var (
@@ -44,63 +50,15 @@ func NewNetworkManager(addr string) (*NetworkManager, error) {
 	if err != nil {
 		return nil, err
 	}
-	go manager.serveIncomingMessages()
+	// stubs
+	manager.SetRemoteOpHandler(func(msg []byte) {})
+	manager.SetGetOpsReceiveVersion(func() []byte {
+		return nil
+	})
+	manager.SetVersionCheckHandler(func(data []byte) ([]byte, bool) {
+		return nil, false
+	})
 	return &manager, nil
-}
-
-func (nm *NetworkManager) serveIncomingMessages() {
-	for msg := range nm.msgChan {
-		switch msg.Type {
-		case MSG_TYPE_NET_META_UPDATE:
-			nm.handleIncomingNetMeta(msg)
-		case MSG_TYPE_TREEDOC_OP:
-			nm.handleIncomingTreedocOp(msg)
-		case MSG_TYPE_VERSION_CHECK:
-			nm.handleIncomingVersionCheck(msg)
-		default:
-			// ignore and do nothing
-		}
-	}
-}
-
-func (nm *NetworkManager) handleIncomingNetMeta(msg Message) {
-	updates, err := newNetMetaFromJson(msg.Msg)
-	if err != nil {
-		return
-	}
-	newNodes, deltaNetMeta, changed := nm.nodePool.applyReceivedUpdates(updates)
-	if changed {
-		nm.session.handleNewNodes(newNodes)
-		msg.Msg = deltaNetMeta.toJson()
-		nm.Broadcast(msg)
-	}
-}
-
-func (nm *NetworkManager) handleIncomingTreedocOp(msg Message) {
-	if nm.TreeDocHandler != nil {
-		nm.TreeDocHandler(msg.Msg)
-	}
-	nm.Broadcast(msg)
-}
-
-func stubGetSyncInfoToReply(versionVector []byte) ([]byte, bool) {
-	// TODO remove this
-	return nil, false
-}
-
-func (nm *NetworkManager) handleIncomingVersionCheck(msg Message) {
-	content, err := newVersionCheckMsgContentFromJson(msg.Msg)
-	if err != nil {
-		return
-	}
-	nm.handleIncomingNetMeta(newNetMetaUpdateMsg(nm.session.id, content.NetworkMeta))
-	syncInfo, shouldReply := stubGetSyncInfoToReply(content.VersionVector)
-	if shouldReply {
-		toSend := NewBroadcastMessage(nm.session.id, MSG_TYPE_SYNC, syncInfo)
-		go func() {
-			nm.nodePool.sendMessageToNodeWithId(toSend, content.Source)
-		}()
-	}
 }
 
 func (nm *NetworkManager) GetCurrentId() string {
@@ -169,22 +127,35 @@ func (nm *NetworkManager) Reconnect() error {
 }
 
 // Broadcast msg asynchronously return whether the msg
+// if session has ended it will not broadcast
 func (nm *NetworkManager) Broadcast(msg Message) {
-	nm.nodePool.broadcast(msg)
+	s := nm.session // this is necessary for thread safety and to avoid nil pointer dereference
+	if s != nil || !s.ended() {
+		nm.nodePool.broadcast(msg)
+	}
+}
+
+// Send msg to a node with specified id
+// if session has ended it will not send
+func (nm *NetworkManager) SendMessageToNodeWithId(msg Message, id string) {
+	s := nm.session // this is necessary for thread safety and to avoid nil pointer dereference
+	if s != nil || !s.ended() {
+		nm.nodePool.sendMessageToNodeWithId(msg, id)
+	}
 }
 
 func (nm *NetworkManager) GetNetworkMetadata() string {
 	return string(nm.nodePool.getLatestNetMetaJsonPrettyPrint())
 }
 
-func (nm *NetworkManager) GetNodePool() *nodePool {
-	return nm.nodePool
+func (nm *NetworkManager) SetRemoteOpHandler(fn func([]byte)) {
+	nm.RemoteOpHandler = fn
 }
 
-func (nm *NetworkManager) SetTreeDocHandler(fn func([]byte)) {
-	nm.TreeDocHandler = fn
+func (nm *NetworkManager) SetVersionCheckHandler(fn func([]byte) ([]byte, bool)) {
+	nm.VersionCheckHandler = fn
 }
 
-func (nm *NetworkManager) RemoveTreeDocHandler() {
-	nm.TreeDocHandler = nil
+func (nm *NetworkManager) SetGetOpsReceiveVersion(fn func() []byte) {
+	nm.GetOpsReceiveVersion = fn
 }

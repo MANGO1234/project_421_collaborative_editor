@@ -5,6 +5,7 @@ import (
 	. "../common"
 	"../documentmanager"
 	"../network"
+	"../version"
 	"fmt"
 	"github.com/nsf/termbox-go"
 	"github.com/satori/go.uuid"
@@ -54,7 +55,6 @@ func doAction(input string) {
 			}
 		} else if appState.MenuOptions[n-1] == OPTION_NEW_DOCUMENT {
 			appState.DocModel = newDocument(StringToSiteId(uuid.NewV1().String()))
-			appState.DocModel.SetBroadcastRemote(broadcastTreeDocOperation)
 			appState.ScreenY = 0
 			appState.State = STATE_DOCUMENT
 		} else if appState.MenuOptions[n-1] == OPTION_CLOSE_DOCUMENT {
@@ -124,13 +124,35 @@ func StartMainLoop(manager *network.NetworkManager) {
 
 	appState.State = STATE_MENU
 	appState.Manager = manager
-	appState.Manager.SetTreeDocHandler(func(msg []byte) {
+	appState.Manager.SetRemoteOpHandler(func(msg []byte) {
 		if appState.DocModel != nil {
-			appState.DocModel.ApplyRemoteOperation(documentmanager.RemoteOperationFromSlice(msg))
+			ops := documentmanager.RemoteOperationsFromSlice(msg)
+			for _, op := range ops {
+				appState.DocModel.ApplyRemoteOperation(op)
+			}
 		}
+	})
+	appState.Manager.SetGetOpsReceiveVersion(func() []byte {
+		if appState.DocModel != nil {
+			return appState.DocModel.GetVersionVectorReceived().MarshalJSON()
+		} else {
+			return nil
+		}
+	})
+	appState.Manager.SetVersionCheckHandler(func(data []byte) ([]byte, bool) {
+		err, vector := version.UnmarshalJSON(data)
+		if appState.DocModel != nil && err == nil {
+			ops, queueOps := appState.DocModel.GetMissingOperations(vector)
+			ops = append(ops, queueOps...)
+			if len(ops) > 0 {
+				return documentmanager.RemoteOperationsToSlice(ops), true
+			}
+		}
+		return nil, false
 	})
 	for {
 		if appState.State == STATE_EXIT {
+			appState.Manager.Disconnect()
 			break
 		}
 		if appState.State == STATE_DOCUMENT {

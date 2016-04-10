@@ -6,6 +6,9 @@ import (
 )
 
 func (s *session) initiateNewNode(n *node) {
+	if n.state != nodeStateDisconnected {
+		return
+	}
 	if shouldConnect(s.manager.addr, n.addr) {
 		go s.connectThread(n)
 	} else {
@@ -30,7 +33,7 @@ func (s *session) pokeThread(n *node) {
 		// a poke succeeded. The responsibility to connect is on
 		// the other node, and we will listen for requests to
 		// connect
-		if n.state != nodeStateDisconnected || s.poke(n.id, n.addr) {
+		if s.ended() || n.state != nodeStateDisconnected || s.poke(n.id, n.addr) {
 			return
 		}
 		n.interval += time.Second
@@ -76,7 +79,7 @@ func (s *session) poke(id, addr string) bool {
 		}
 		return reply == "done"
 	} else {
-		s.manager.nodePool.forceNodeQuit(n)
+		s.manager.msgChan <- newNetMetaUpdateMsg(s.id, newQuitNetMeta(id, addr))
 		return true
 	}
 }
@@ -86,7 +89,8 @@ func (s *session) connectThread(n *node) {
 	// than remote addr.
 	n.interval = 0
 	for {
-		if n.state != nodeStateDisconnected || s.connect(n) {
+		if s.ended() || n.state != nodeStateDisconnected || s.connect(n) {
+			// connectThread stops when session ends
 			return
 		}
 		n.interval += time.Second
@@ -105,7 +109,6 @@ func (s *session) connect(n *node) bool {
 	defer func(err error, n *node) {
 		if err != nil {
 			n.close()
-			n.resetConn()
 		}
 	}(err, n)
 	err = n.writeMessage(dialingTypeConnect)
@@ -129,35 +132,43 @@ func (s *session) connect(n *node) bool {
 		if err != nil {
 			return false
 		}
-		err = n.sendMessage(s.getLatestVersionCheckMsg())
+
+		hasMsg, msg := s.getLatestVersionCheckMsg()
+		if hasMsg {
+			err = n.sendMessage(msg)
+		}
 		if err != nil {
 			return false
 		}
-		n.state = nodeStateConnected
-		go s.sendThread(getSendWrapperFromNode(n))
-		go s.receiveThread(n)
+		if n.setState(nodeStateConnected) {
+			go s.sendThread(getSendWrapperFromNode(n))
+			go s.receiveThread(n)
+		}
 		return true
 	} else {
 		n.close()
-		n.resetConn()
-		s.manager.nodePool.forceNodeQuit(n)
+		s.manager.msgChan <- newNetMetaUpdateMsg(s.id, newQuitNetMeta(n.id, n.addr))
 		return true
 	}
 }
 
 func (s *session) receiveThread(n *node) {
 	for {
-		if n.state == nodeStateLeft {
+		if n.state != nodeStateConnected {
+			n.close()
 			return
 		}
 		msg, err := n.receiveMessage()
 		if err != nil {
 			n.close()
-			n.resetConn()
-			n.state = nodeStateDisconnected
+			n.setState(nodeStateDisconnected)
 			if shouldConnect(s.manager.addr, n.addr) {
 				go s.connectThread(n)
 			}
+			return
+		}
+		if s.ended() {
+			// stops receiving msg once session ends
 			return
 		}
 		s.manager.msgChan <- msg
@@ -165,12 +176,19 @@ func (s *session) receiveThread(n *node) {
 }
 
 func (s *session) sendThread(sendWrapper *node) {
-	for msg := range sendWrapper.outChan {
-		err := sendWrapper.sendMessage(msg)
-		if err != nil {
-			sendWrapper.close()
-			sendWrapper.outChan <- msg
-			return
+	for done := false; !done || len(sendWrapper.outChan) > 0; {
+		select {
+		case msg := <-sendWrapper.outChan:
+			err := sendWrapper.sendMessage(msg)
+			if err != nil {
+				sendWrapper.close()
+				sendWrapper.outChan <- msg
+				return
+			}
+		case <-s.done:
+			done = true
 		}
 	}
+	sendWrapper.sendMessage(newNetMetaUpdateMsg(s.id, newQuitNetMeta(s.id, s.manager.addr)))
+	sendWrapper.close()
 }

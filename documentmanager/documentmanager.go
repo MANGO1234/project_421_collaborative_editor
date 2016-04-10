@@ -5,7 +5,6 @@ import (
 	. "../common"
 	"../treedoc2"
 	"../version"
-	"encoding/json"
 	"fmt"
 	"sync"
 )
@@ -23,14 +22,15 @@ type DocumentModel struct {
 	BroadcastRemote func(RemoteOperation)
 }
 
-func NewDocumentModel(id SiteId, width int, updateGUI func()) *DocumentModel {
+func NewDocumentModel(id SiteId, width int, updateGUI func(), broadcastRemote func(RemoteOperation)) *DocumentModel {
 	return &DocumentModel{
-		OwnerId:   id,
-		Treedoc:   treedoc2.NewDocument(),
-		Buffer:    buffer.StringToBuffer("", width),
-		Queue:     NewQueue(),
-		Log:       NewLog(),
-		UpdateGUI: updateGUI,
+		OwnerId:         id,
+		Treedoc:         treedoc2.NewDocument(),
+		Buffer:          buffer.StringToBuffer("", width),
+		Queue:           NewQueue(),
+		Log:             NewLog(),
+		UpdateGUI:       updateGUI,
+		BroadcastRemote: broadcastRemote,
 	}
 }
 
@@ -119,30 +119,19 @@ func (model *DocumentModel) Debug() {
 	fmt.Println(model.Log.Vector)
 }
 
-func (model *DocumentModel) SetBroadcastRemote(fn func(RemoteOperation)) {
-	model.BroadcastRemote = fn
+func (model *DocumentModel) GetVersionVectorReceived() version.VersionVector {
+	v := model.Log.Vector.Copy()
+	v.Merge(model.Queue.vector)
+	return v
 }
 
-func (model *DocumentModel) RemoveBroadcastRemote() {
-	model.BroadcastRemote = nil
-}
-
-type MissingOperation struct {
-	missingOp   []treedoc2.Operation
-	missingElem []RemoteOperation
-}
-
-func (model *DocumentModel) HandleVersionVector(vector version.VersionVector) {
-	myVec := model.Log.Vector.Copy()
+func (model *DocumentModel) GetMissingOperations(vector version.VersionVector) ([]RemoteOperation, []RemoteOperation) {
+	myVec := model.GetVersionVectorReceived()
 	compare := myVec.Compare(vector)
 	if compare == version.GREATER_THAN || compare == version.CONFLICT {
 		ops := model.Log.GetMissingOperations(vector)
-		queueOps := model.Queue.GetMissingRemoteOperations(vector)
-		SendMissingOperations(MissingOperation{missingOp: ops, missingElem: queueOps})
+		queueOps := model.Queue.GetMissingOperations(vector)
+		return ops, queueOps
 	}
-}
-
-func SendMissingOperations(ops MissingOperation) {
-	json.Marshal(ops)
-	// TODO: call network to send missing operations
+	return nil, nil
 }

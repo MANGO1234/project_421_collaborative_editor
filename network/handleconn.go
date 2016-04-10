@@ -98,7 +98,10 @@ func (s *session) handleConnect(connWrapper *node) {
 	if err != nil {
 		return
 	}
-	err = connWrapper.sendMessage(s.getLatestVersionCheckMsg())
+	hasMsg, msg := s.getLatestVersionCheckMsg()
+	if hasMsg {
+		err = connWrapper.sendMessage(msg)
+	}
 	if err != nil {
 		return
 	}
@@ -106,7 +109,8 @@ func (s *session) handleConnect(connWrapper *node) {
 	n.conn = connWrapper.conn
 	n.reader = connWrapper.reader
 	n.writer = connWrapper.writer
-	n.state = nodeStateConnected
-	go s.sendThread(getSendWrapperFromNode(n))
-	go s.receiveThread(n)
+	if n.setState(nodeStateConnected) {
+		go s.sendThread(getSendWrapperFromNode(n))
+		go s.receiveThread(n)
+	}
 }
