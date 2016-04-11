@@ -39,7 +39,7 @@ func (n *node) close() {
 }
 
 func (n *node) writeLog(buf interface{}, msgNote string) error {
-	d := fmt.Sprintln(buf)
+	d := fmt.Sprint(buf)
 	msgByte := n.logger.PrepareSend("send byte "+msgNote+d, buf)
 	err := n.writer.WriteMessageSlice(msgByte)
 	return err
@@ -48,8 +48,6 @@ func (n *node) writeLog(buf interface{}, msgNote string) error {
 func (n *node) readLog(unpack interface{}, msgNote string) error {
 	msg, err := n.reader.ReadMessageSlice()
 	n.logger.UnpackReceive("receive byte "+msgNote, msg, unpack)
-	//	d := fmt.Sprintln(unpack)
-	//	n.logger.LogLocalEvent("last received byte content: "+ d)
 	return err
 }
 
@@ -80,14 +78,14 @@ func parseMessageHelper(msg Message) string {
 	switch msg.Type {
 	case MSG_TYPE_NET_META_UPDATE:
 		nm, _ := newNetMetaFromJson(msg.Msg)
-		msgPrint = msgPrint + fmt.Sprintln(nm)
+		msgPrint = msgPrint + fmt.Sprint(nm)
 		break
 	case MSG_TYPE_VERSION_CHECK:
 		vcm, _ := newVersionCheckMsgContentFromJson(msg.Msg)
-		msgPrint = msgPrint + fmt.Sprintln(vcm)
+		msgPrint = msgPrint + fmt.Sprint(vcm)
 		break
 	default: //remote op
-		msgPrint = msgPrint + fmt.Sprintln(documentmanager.RemoteOperationsFromSlice(msg.Msg))
+		msgPrint = msgPrint + fmt.Sprint(documentmanager.RemoteOperationsFromSlice(msg.Msg))
 	}
 	return msgPrint
 }
@@ -106,7 +104,5 @@ func (n *node) receiveMessage(msgNote string) (Message, error, bool) {
 	}
 	msg := new(Message)
 	n.logger.UnpackReceive("receive byte "+msgNote, msgJson, &msg)
-	//d := fmt.Sprintln(msg)
-	//n.logger.LogLocalEvent("last received byte content: "+ d)
 	return *msg, err, true
 }
