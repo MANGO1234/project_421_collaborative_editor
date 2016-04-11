@@ -134,9 +134,9 @@ func (s *session) connect(n *node) bool {
 		hasMsg, msg := s.getLatestVersionCheckMsg()
 		if hasMsg {
 			err = n.sendMessage(msg)
-		}
-		if err != nil {
-			return false
+			if err != nil {
+				return false
+			}
 		}
 		if n.setState(nodeStateConnected) {
 			go s.sendThread(getSendWrapperFromNode(n))
@@ -156,13 +156,16 @@ func (s *session) receiveThread(n *node) {
 			n.close()
 			return
 		}
-		msg, err := n.receiveMessage()
-		if err != nil {
+		msg, err, connOk := n.receiveMessage()
+		if !connOk {
 			n.close()
 			n.setState(nodeStateDisconnected)
 			if shouldConnect(s.manager.addr, n.addr) {
 				go s.connectThread(n)
 			}
+			return
+		}
+		if err != nil {
 			return
 		}
 		if s.ended() {

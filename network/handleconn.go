@@ -1,6 +1,8 @@
 package network
 
-import "net"
+import (
+	"net"
+)
 
 func (s *session) handleNewConn(conn net.Conn) {
 	n := newConnWrapper(conn)
@@ -97,9 +99,9 @@ func (s *session) handleConnect(connWrapper *node) {
 	hasMsg, msg := s.getLatestVersionCheckMsg()
 	if hasMsg {
 		err = connWrapper.sendMessage(msg)
-	}
-	if err != nil {
-		return
+		if err != nil {
+			return
+		}
 	}
 	n := s.manager.nodePool.addOrGetNodeFromPool(id, NodeMeta{addr, false})
 	n.conn = connWrapper.conn

@@ -55,10 +55,11 @@ func (n *node) sendMessage(msg Message) error {
 	return n.writeMessageSlice(msg.toJson())
 }
 
-func (n *node) receiveMessage() (Message, error) {
+func (n *node) receiveMessage() (Message, error, bool) {
 	msgJson, err := n.readMessageSlice()
 	if err != nil {
-		return Message{}, err
+		return Message{}, err, false
 	}
-	return newMessageFromJson(msgJson)
+	msg, err := newMessageFromJson(msgJson)
+	return msg, err, true
 }
