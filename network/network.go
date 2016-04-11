@@ -123,7 +123,7 @@ func (nm *NetworkManager) Reconnect() error {
 // if session has ended it will not broadcast
 func (nm *NetworkManager) Broadcast(msg Message) {
 	s := nm.session // this is necessary for thread safety and to avoid nil pointer dereference
-	if s != nil || !s.ended() {
+	if s != nil && !s.ended() {
 		nm.nodePool.broadcast(msg)
 	}
 }
