@@ -40,12 +40,13 @@ var (
 // address addr to handle network operations
 func NewNetworkManager(localAddr, publicAddr string) (*NetworkManager, error) {
 	os.Mkdir("govecLogTxt", os.ModeDir)
+	logger := govec.Initialize(localAddr, "govecLogTxt/"+strings.Replace(localAddr, ":", "_", 100))
 	manager := NetworkManager{
 		localAddr:  localAddr,
 		publicAddr: publicAddr,
 		msgChan:    make(chan Message, 30),
-		nodePool:   newNodePool(),
-		logger:     govec.Initialize(localAddr, "govecLogTxt/"+strings.Replace(localAddr, ":", "_", 100)),
+		nodePool:   newNodePool(logger),
+		logger:     logger,
 	}
 	err := startNewSessionOnNetworkManager(&manager)
 	if err != nil {

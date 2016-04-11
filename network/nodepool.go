@@ -56,12 +56,14 @@ type nodePool struct {
 	netMeta      NetMeta
 	poolMutex    sync.RWMutex
 	pool         map[string]*node
+	logger       *govec.GoLog
 }
 
-func newNodePool() *nodePool {
+func newNodePool(logger *govec.GoLog) *nodePool {
 	var np nodePool
 	np.netMeta = newNetMeta()
 	np.pool = make(map[string]*node)
+	np.logger = logger
 	return &np
 }
 
@@ -200,7 +202,7 @@ func (np *nodePool) removeNodeFromPool(id string) {
 	np.poolMutex.Unlock()
 }
 
-func (np *nodePool) addOrGetNodeFromPool(id string, nodeMeta NodeMeta) *node {
+func (np *nodePool) addOrGetNodeFromPool(id string, nodeMeta NodeMeta, logger *govec.GoLog) *node {
 	np.poolMutex.Lock()
 	n, ok := np.pool[id]
 	if !ok {
@@ -209,6 +211,7 @@ func (np *nodePool) addOrGetNodeFromPool(id string, nodeMeta NodeMeta) *node {
 			addr:    nodeMeta.Addr,
 			outChan: make(chan Message, chanBufferSize),
 			state:   nodeStateDisconnected,
+			logger:  np.logger,
 		}
 		np.pool[id] = n
 	}
@@ -226,7 +229,7 @@ func (np *nodePool) applyReceivedUpdates(updates NetMeta) (nodeList []*node, del
 		if n.Left {
 			np.removeNodeFromPool(id)
 		} else {
-			nodeList = append(nodeList, np.addOrGetNodeFromPool(id, n))
+			nodeList = append(nodeList, np.addOrGetNodeFromPool(id, n, np.logger))
 		}
 	}
 	return
