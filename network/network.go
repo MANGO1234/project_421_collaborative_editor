@@ -13,6 +13,7 @@ import (
 	"errors"
 	"github.com/arcaneiceman/GoVector/govec"
 	"net"
+	"strings"
 )
 
 type NetworkManager struct {
@@ -42,7 +43,7 @@ func NewNetworkManager(localAddr, publicAddr string) (*NetworkManager, error) {
 		publicAddr: publicAddr,
 		msgChan:    make(chan Message, 30),
 		nodePool:   newNodePool(),
-		logger:     govec.Initialize(localAddr, "govecLogTxt/"+localAddr),
+		logger:     govec.Initialize(localAddr, "govecLogTxt/"+strings.Replace(localAddr, ":", "_", 100)),
 	}
 	err := startNewSessionOnNetworkManager(&manager)
 	if err != nil {
