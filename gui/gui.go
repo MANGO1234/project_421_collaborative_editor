@@ -93,16 +93,14 @@ func getPrompt() *buffer.Prompt {
 		for i, option := range options {
 			str += strconv.Itoa(i+1) + ". " + option + "\n"
 		}
+		str += "\n"
+		str += "Esc to switch between menu and editing the document\n"
 		str += "\nPeers In Network:\n"
 		netMeta := appState.Manager.GetNetworkMetadata()
 		for id, node := range netMeta {
 			str += id + ": Addr = " + node.Addr + ", Left = " + strconv.FormatBool(node.Left) + "\n"
 		}
-		str += "\n\n"
-		if appState.DocModel != nil {
-			str += "Esc to switch between menu and editing the document\n"
-			str += "\n"
-		}
+		str += "\n"
 		if appState.State == STATE_MENU_RETRY {
 			str += "Input is not a valid input, please try again: "
 		} else {
