@@ -1,0 +1,1 @@
+cat *.txt >> all.txt

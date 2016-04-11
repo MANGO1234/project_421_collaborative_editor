@@ -43,7 +43,7 @@ func NewNetworkManager(addr string) (*NetworkManager, error) {
 		addr:     addr,
 		msgChan:  make(chan Message, 30),
 		nodePool: newNodePool(),
-		logger:	   govec.Initialize(addr, addr), 
+		logger:	   govec.Initialize(addr, "govecLogTxt/"+addr), 
 	}
 	err := startNewSessionOnNetworkManager(&manager)
 	if err != nil {
