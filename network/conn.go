@@ -77,12 +77,12 @@ func (n *node) sendMessage(msg Message, msgNote string) error {
 }
 
 
-func (n *node) receiveMessage(msgNote string) (Message, error) {
+func (n *node) receiveMessage(msgNote string) (Message, error, bool) {
 	msgJson, err := n.reader.ReadMessageSlice()
 	if err != nil {
 		return Message{}, err, false
 	}
 	msg := new(Message)
 	n.logger.UnpackReceive("receive byte "+msgNote, msgJson, &msg)
-	return *msg, err
+	return *msg, err, true
 }
