@@ -58,7 +58,7 @@ func (reader *MessageReader) ReadMessageBuffer() (*bytes.Buffer, error) {
 	i := 0
 	var buf bytes.Buffer
 	for i < n {
-		k, err := reader.Reader.ReadSlice('\n')
+		k, err := reader.Reader.ReadBytes('\n')
 		if err != nil {
 			return nil, err
 		}
