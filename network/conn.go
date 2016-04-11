@@ -1,10 +1,11 @@
 package network
 
 import (
+	"../documentmanager"
 	"../util"
 	"bufio"
-	"net"
 	"fmt"
+	"net"
 )
 
 // These are methods on node which acts like a connection wrapper
@@ -47,8 +48,8 @@ func (n *node) writeLog(buf interface{}, msgNote string) error {
 func (n *node) readLog(unpack interface{}, msgNote string) error {
 	msg, err := n.reader.ReadMessageSlice()
 	n.logger.UnpackReceive("receive byte "+msgNote, msg, unpack)
-//	d := fmt.Sprintln(unpack)
-//	n.logger.LogLocalEvent("last received byte content: "+ d)
+	//	d := fmt.Sprintln(unpack)
+	//	n.logger.LogLocalEvent("last received byte content: "+ d)
 	return err
 }
 
@@ -74,13 +75,29 @@ func (n *node) readMessage(msgNote string) (string, error) {
 	return unpack, err
 }
 
+func parseMessageHelper(msg Message) string {
+	msgPrint := msg.Type + fmt.Sprintln(msg.Visited)
+	switch msg.Type {
+	case MSG_TYPE_NET_META_UPDATE:
+		nm, _ := newNetMetaFromJson(msg.Msg)
+		msgPrint = msgPrint + fmt.Sprintln(nm)
+		break
+	case MSG_TYPE_VERSION_CHECK:
+		vcm, _ := newVersionCheckMsgContentFromJson(msg.Msg)
+		msgPrint = msgPrint + fmt.Sprintln(vcm)
+		break
+	default: //remote op
+		msgPrint = msgPrint + fmt.Sprintln(documentmanager.RemoteOperationsFromSlice(msg.Msg))
+	}
+	return msgPrint
+}
+
 func (n *node) sendMessage(msg Message, msgNote string) error {
-	d := fmt.Sprintln(msg)
-	msgByte := n.logger.PrepareSend("send byte "+msgNote+d, msg)
+	msgPrint := parseMessageHelper(msg)
+	msgByte := n.logger.PrepareSend("send byte "+msgNote+msgPrint, msg)
 	err := n.writer.WriteMessageSlice(msgByte)
 	return err
 }
-
 
 func (n *node) receiveMessage(msgNote string) (Message, error, bool) {
 	msgJson, err := n.reader.ReadMessageSlice()
