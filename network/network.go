@@ -87,24 +87,24 @@ func (nm *NetworkManager) ConnectTo(remoteAddr string) error {
 	defer conn.Close()
 	n := newConnWrapper(conn)
 	n.logger = nm.logger
-	err = n.writeMessage(dialingTypeRegister)
+	err = n.writeMessage(dialingTypeRegister, "ConnectTo dialingTypeRegister")
 	if err != nil {
 		return err
 	}
 	incoming := new(NetMeta)
-	err = n.readLog(incoming)
+	err = n.readLog(incoming, "ConnectTo incomingNetMeta")
 	if err != nil {
 		return err
 	}
 
 	defer func() { nm.msgChan <- newNetMetaUpdateMsg(nm.id, *incoming) }()
 	latestNetMeta := nm.nodePool.getLatestNetMeta()
-	err = n.writeLog(latestNetMeta)
+	err = n.writeLog(latestNetMeta, "ConnectTo latestNetMeta")
 	if err != nil {
 		return errors.New("Partially connected: unable to send message to " +
 			"requested node, but was able to receive information.")
 	}
-	nm.logger.LogLocalEvent("connectTo fun end")
+	nm.logger.LogLocalEvent("ConnectTo function done")
 	return nil
 }
 
@@ -115,11 +115,13 @@ func (nm *NetworkManager) Disconnect() error {
 	}
 	nm.session.end()
 	nm.session = nil
+	nm.logger.LogLocalEvent("Disconnected======")
 	return nil
 }
 
 // Reconnect rejoins the network with new UUID.
 func (nm *NetworkManager) Reconnect() error {
+	nm.logger.LogLocalEvent("begin reconnect========")
 	if nm.session != nil {
 		return ErrAlreadyConnected
 	}
@@ -131,6 +133,7 @@ func (nm *NetworkManager) Reconnect() error {
 func (nm *NetworkManager) Broadcast(msg Message) {
 	s := nm.session // this is necessary for thread safety and to avoid nil pointer dereference
 	if s != nil || !s.ended() {
+		nm.logger.LogLocalEvent("begin broadcast========")
 		nm.nodePool.broadcast(msg)
 	}
 }

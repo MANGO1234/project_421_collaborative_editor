@@ -77,7 +77,7 @@ func (n *node) sendMessage(msg Message, msgNote string) error {
 }
 
 func (n *node) receiveMessage(msgNote string) (Message, error) {
-	msgJson, err := n.readMessageSlice()
+	msgJson, err := n.reader.ReadMessageSlice()
 	if err != nil {
 		return Message{}, err
 	}

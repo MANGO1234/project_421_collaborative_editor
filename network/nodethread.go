@@ -50,30 +50,30 @@ func (s *session) poke(id, addr string) bool {
 	defer conn.Close()
 	n := newConnWrapper(conn)
 	n.logger = s.manager.logger 
-	err = n.writeMessage(dialingTypePoke)
+	err = n.writeMessage(dialingTypePoke, "poke dialingTypePoke")
 	if err != nil {
 		return false
 	}
-	err = n.writeMessage(id)
+	err = n.writeMessage(id, "poke id")
 	if err != nil {
 		return false
 	}
-	match, err := n.readMessage()
+	match, err := n.readMessage("poke match")
 	if err != nil {
 		return false
 	}
 	if match == "true" {
-		err = n.writeMessage(s.id)
+		err = n.writeMessage(s.id, "poke s.id")
 		if err != nil {
 			return false
 		}
-		err = n.writeMessage(s.manager.addr)
+		err = n.writeMessage(s.manager.addr, "poke, s.addr")
 		if err != nil {
 			return false
 		}
 		// TODO: not sure if the following is necessary when using tcp
 		// but it gives more guarantees
-		reply, err := n.readMessage()
+		reply, err := n.readMessage("poke reply")
 		if err != nil {
 			return false
 		}
@@ -111,31 +111,31 @@ func (s *session) connect(n *node) bool {
 			n.close()
 		}
 	}(err, n)
-	err = n.writeMessage(dialingTypeConnect)
+	err = n.writeMessage(dialingTypeConnect, "connect dialingTypeConnect")
 	if err != nil {
 		return false
 	}
-	err = n.writeMessage(n.id)
+	err = n.writeMessage(n.id, "connect n.id")
 	if err != nil {
 		return false
 	}
-	match, err := n.readMessage()
+	match, err := n.readMessage("connect match")
 	if err != nil {
 		return false
 	}
 	if match == "true" {
-		err = n.writeMessage(s.id)
+		err = n.writeMessage(s.id, "connect s.id")
 		if err != nil {
 			return false
 		}
-		err = n.writeMessage(s.manager.addr)
+		err = n.writeMessage(s.manager.addr, "connect s.addr")
 		if err != nil {
 			return false
 		}
 
 		hasMsg, msg := s.getLatestVersionCheckMsg()
 		if hasMsg {
-			err = n.sendMessage(msg)
+			err = n.sendMessage(msg, "connect LatestVersionCheckMsg")
 		}
 		if err != nil {
 			return false
@@ -158,7 +158,7 @@ func (s *session) receiveThread(n *node) {
 			n.close()
 			return
 		}
-		msg, err := n.receiveMessage()
+		msg, err := n.receiveMessage("receiveThread msg")
 		if err != nil {
 			n.close()
 			n.setState(nodeStateDisconnected)
@@ -179,7 +179,7 @@ func (s *session) sendThread(sendWrapper *node) {
 	for done := false; !done || len(sendWrapper.outChan) > 0; {
 		select {
 		case msg := <-sendWrapper.outChan:
-			err := sendWrapper.sendMessage(msg)
+			err := sendWrapper.sendMessage(msg, "sendThread outChan msg")
 			if err != nil {
 				sendWrapper.close()
 				sendWrapper.outChan <- msg
@@ -189,6 +189,6 @@ func (s *session) sendThread(sendWrapper *node) {
 			done = true
 		}
 	}
-	sendWrapper.sendMessage(newNetMetaUpdateMsg(s.id, newQuitNetMeta(s.id, s.manager.addr)))
+	sendWrapper.sendMessage(newNetMetaUpdateMsg(s.id, newQuitNetMeta(s.id, s.manager.addr)), "sendThread newNetMetaUpdateMsg")
 	sendWrapper.close()
 }

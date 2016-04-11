@@ -6,7 +6,7 @@ func (s *session) handleNewConn(conn net.Conn) {
 	n := newConnWrapper(conn)
 	n.logger = s.manager.logger
 	// distinguish purpose of this connection
-	purpose, err := n.readMessage()
+	purpose, err := n.readMessage("handleNewConn purpose")
 	n.logger.LogLocalEvent(purpose)
 	if err != nil {
 		conn.Close()
@@ -27,12 +27,12 @@ func (s *session) handleNewConn(conn net.Conn) {
 func (s *session) handleRegister(connWrapper *node) {
 	defer connWrapper.close()
 	latestNetMeta := s.manager.nodePool.getLatestNetMeta()
-	err := connWrapper.writeLog(latestNetMeta)
+	err := connWrapper.writeLog(latestNetMeta, "handleRegister lastestNetMeta")
 	if err != nil {
 		return
 	}
 	incoming := new(NetMeta)
-	err = connWrapper.readLog(incoming)
+	err = connWrapper.readLog(incoming, "handleRegister lastestNetMeta")
 	if err != nil {
 		return
 	}
@@ -46,34 +46,34 @@ func (s *session) handleRegister(connWrapper *node) {
 
 func (s *session) handlePoke(connWrapper *node) {
 	defer connWrapper.close()
-	expectedId, err := connWrapper.readMessage()
+	expectedId, err := connWrapper.readMessage("handlePoke expectedId")
 	if err != nil {
 		return
 	}
 	if s.id != expectedId {
-		connWrapper.writeMessage("false")
+		connWrapper.writeMessage("false", "handlePoke false")
 		return
 	}
-	err = connWrapper.writeMessage("true")
+	err = connWrapper.writeMessage("true", "handlePoke true")
 	if err != nil {
 		return
 	}
-	id, err := connWrapper.readMessage()
+	id, err := connWrapper.readMessage("handlePoke id")
 	if err != nil {
 		return
 	}
-	addr, err := connWrapper.readMessage()
+	addr, err := connWrapper.readMessage("handlePoke addr")
 	if err != nil {
 		return
 	}
 	s.manager.msgChan <- newNetMetaUpdateMsg(s.id, newJoinNetMeta(id, addr))
 	// TODO: not sure if the following is necessary when using tcp
 	// but it gives more guarantees
-	connWrapper.writeMessage("done") // best we can do
+	connWrapper.writeMessage("done", "handlePoke done") // best we can do
 }
 
 func (s *session) handleConnect(connWrapper *node) {
-	expectedId, err := connWrapper.readMessage()
+	expectedId, err := connWrapper.readMessage("handleConnect expectedId")
 	defer func(err error, connWrapper *node) {
 		if err != nil {
 			connWrapper.close()
@@ -83,24 +83,24 @@ func (s *session) handleConnect(connWrapper *node) {
 		return
 	}
 	if s.id != expectedId {
-		connWrapper.writeMessage("false")
+		connWrapper.writeMessage("false", "handleConnect false")
 		return
 	}
-	err = connWrapper.writeMessage("true")
+	err = connWrapper.writeMessage("true", "handleConnect true")
 	if err != nil {
 		return
 	}
-	id, err := connWrapper.readMessage()
+	id, err := connWrapper.readMessage("handleConnect id")
 	if err != nil {
 		return
 	}
-	addr, err := connWrapper.readMessage()
+	addr, err := connWrapper.readMessage("handleConnect addr")
 	if err != nil {
 		return
 	}
 	hasMsg, msg := s.getLatestVersionCheckMsg()
 	if hasMsg {
-		err = connWrapper.sendMessage(msg)
+		err = connWrapper.sendMessage(msg, "handleConnect versionCheckMsg")
 	}
 	if err != nil {
 		return
