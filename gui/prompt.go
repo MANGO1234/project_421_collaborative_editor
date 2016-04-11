@@ -39,6 +39,9 @@ func DrawPrompt(prompt *buffer.Prompt) error {
 			case termbox.KeyBackspace:
 				prompt.Delete()
 				redrawPrompt(prompt, width, height)
+			case termbox.KeyBackspace2:
+				prompt.Delete()
+				redrawPrompt(prompt, width, height)
 			case termbox.KeySpace:
 				prompt.Insert(' ')
 				redrawPrompt(prompt, width, height)
