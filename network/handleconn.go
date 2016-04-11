@@ -1,6 +1,8 @@
 package network
 
-import "net"
+import (
+	"net"
+)
 
 func (s *session) handleNewConn(conn net.Conn) {
 	n := newConnWrapper(conn)

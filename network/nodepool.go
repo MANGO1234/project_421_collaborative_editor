@@ -65,10 +65,11 @@ func newNodePool() *nodePool {
 	return &np
 }
 
-func (np *nodePool) sendMessageToNodeWithId(msg Message, id string) {
+func (np *nodePool) sendMessageToNodeWithId(msg Message, id string) bool {
 	if n, ok := np.getNodeWithId(id); ok {
-		putMsgOnSendingQueueOfNode(msg, n)
+		return putMsgOnSendingQueueOfNode(msg, n)
 	}
+	return false
 }
 
 func (np *nodePool) broadcast(msg Message) {
@@ -99,17 +100,23 @@ func (np *nodePool) broadcastRecursive(msg Message) {
 	}
 	for _, n := range connected {
 		if _, ok := original[n.id]; !ok {
-			putMsgOnSendingQueueOfNode(msg, n)
+			successful := putMsgOnSendingQueueOfNode(msg, n)
+			if !successful {
+				delete(msg.Visited, n.id)
+			}
 		}
 	}
 }
 
-func putMsgOnSendingQueueOfNode(msg Message, n *node) {
+// returns whether putting on the queue is successful
+func putMsgOnSendingQueueOfNode(msg Message, n *node) bool {
 	// if the channel buffer is full we just drop it
 	// there's no point in sending way more than the node can handle
 	select {
 	case n.outChan <- msg:
+		return true
 	default: // dumps the msg if buffer is full
+		return false
 	}
 }
 

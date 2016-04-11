@@ -132,19 +132,21 @@ func (nm *NetworkManager) Reconnect() error {
 // if session has ended it will not broadcast
 func (nm *NetworkManager) Broadcast(msg Message) {
 	s := nm.session // this is necessary for thread safety and to avoid nil pointer dereference
-	if s != nil || !s.ended() {
-		nm.logger.LogLocalEvent("begin broadcast========")
-		nm.nodePool.broadcast(msg)
+	if s == nil && s.ended() {
+		return
 	}
+	nm.logger.LogLocalEvent("begin broadcast========")
+	nm.nodePool.broadcast(msg)
 }
 
 // Send msg to a node with specified id
 // if session has ended it will not send
 func (nm *NetworkManager) SendMessageToNodeWithId(msg Message, id string) {
 	s := nm.session // this is necessary for thread safety and to avoid nil pointer dereference
-	if s != nil || !s.ended() {
-		nm.nodePool.sendMessageToNodeWithId(msg, id)
+	if s == nil || s.ended() {
+		return
 	}
+	nm.nodePool.sendMessageToNodeWithId(msg, id)
 }
 
 func (nm *NetworkManager) GetNetworkMetadata() string {

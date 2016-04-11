@@ -3,9 +3,9 @@ package network
 import "encoding/json"
 
 const (
-	MSG_TYPE_VERSION_CHECK   = "versioncheck" // no broadcast
-	MSG_TYPE_NET_META_UPDATE = "netmeta"      // broadcast
-	MSG_TYPE_REMOTE_OP       = "treedocOp"    // broadcast
+	MSG_TYPE_VERSION_CHECK   = "versioncheck" // non-recursive
+	MSG_TYPE_NET_META_UPDATE = "netmeta"      // recursive broadcast
+	MSG_TYPE_REMOTE_OP       = "treedocOp"    // (non) recursive broadcast Indicate by the Visited field
 	MSG_TYPE_SYNC            = "sync"         // broadcast
 )
 
@@ -27,6 +27,14 @@ func NewBroadcastMessage(id, msgType string, content []byte) Message {
 	return Message{
 		msgType,
 		map[string]struct{}{id: struct{}{}},
+		content,
+	}
+}
+
+func NewReplyMessage(msgType string, content []byte) Message {
+	return Message{
+		msgType,
+		nil,
 		content,
 	}
 }

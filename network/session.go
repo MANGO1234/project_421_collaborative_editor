@@ -92,7 +92,9 @@ func (s *session) handleIncomingRemoteOp(msg Message) {
 	if s.manager.RemoteOpHandler != nil {
 		go s.manager.RemoteOpHandler(msg.Msg)
 	}
-	s.manager.nodePool.broadcast(msg)
+	if msg.Visited != nil { // we should only recursively broadcast in this case
+		s.manager.nodePool.broadcast(msg)
+	}
 }
 
 func (s *session) handleIncomingVersionCheck(msg Message) {
@@ -103,7 +105,7 @@ func (s *session) handleIncomingVersionCheck(msg Message) {
 	s.handleIncomingNetMeta(newNetMetaUpdateMsg(s.id, content.NetworkMeta))
 	syncInfo, shouldReply := s.manager.VersionCheckHandler(content.VersionVector)
 	if shouldReply {
-		toSend := NewBroadcastMessage(s.id, MSG_TYPE_REMOTE_OP, syncInfo)
+		toSend := NewReplyMessage(MSG_TYPE_REMOTE_OP, syncInfo)
 		go func() {
 			s.manager.nodePool.sendMessageToNodeWithId(toSend, content.Source)
 		}()
