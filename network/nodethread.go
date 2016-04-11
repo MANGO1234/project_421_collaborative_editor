@@ -1,7 +1,6 @@
 package network
 
 import (
-	"fmt"
 	"net"
 	"time"
 )
@@ -44,7 +43,6 @@ func (s *session) pokeThread(n *node) {
 
 // returns whether the poke succeeded
 func (s *session) poke(id, addr string) bool {
-	fmt.Println("POKE")
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		return false
@@ -101,7 +99,6 @@ func (s *session) connectThread(n *node) {
 
 // returns whether connect succeeded
 func (s *session) connect(n *node) bool {
-	fmt.Println("TRY CONN")
 	conn, err := net.Dial("tcp", n.addr)
 	if err != nil {
 		return false
@@ -154,8 +151,6 @@ func (s *session) connect(n *node) bool {
 }
 
 func (s *session) receiveThread(n *node) {
-	fmt.Println("REC")
-	defer fmt.Println("Receive ended: ")
 	for {
 		if n.state != nodeStateConnected {
 			n.close()
@@ -163,8 +158,6 @@ func (s *session) receiveThread(n *node) {
 		}
 		msg, err, connOk := n.receiveMessage()
 		if !connOk {
-			fmt.Println("NotOK")
-			fmt.Println(err)
 			n.close()
 			n.setState(nodeStateDisconnected)
 			if shouldConnect(s.manager.addr, n.addr) {
@@ -173,7 +166,6 @@ func (s *session) receiveThread(n *node) {
 			return
 		}
 		if err != nil {
-			fmt.Println("RT:fmt problem")
 			return
 		}
 		if s.ended() {
@@ -185,7 +177,6 @@ func (s *session) receiveThread(n *node) {
 }
 
 func (s *session) sendThread(sendWrapper *node) {
-	fmt.Println("SEND")
 	for done := false; !done || len(sendWrapper.outChan) > 0; {
 		select {
 		case msg := <-sendWrapper.outChan:
