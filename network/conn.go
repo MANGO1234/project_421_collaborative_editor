@@ -36,48 +36,52 @@ func (n *node) close() {
 	n.conn.Close()
 }
 
-
-func (n *node) writeLog(buf interface{}) error{
-	msgByte :=  n.logger.PrepareSend("send byte", buf)
+func (n *node) writeLog(buf interface{}, msgNote string) error {
+	msgByte := n.logger.PrepareSend("send byte "+msgNote, buf)
 	err := n.writer.WriteMessageSlice(msgByte)
 	return err
 }
 
-func (n *node) readLog(unpack interface{}) error{
+func (n *node) readLog(unpack interface{}, msgNote string) error {
 	msg, err := n.reader.ReadMessageSlice()
-	n.logger.UnpackReceive("receive byte", msg, unpack)
+	n.logger.UnpackReceive("receive byte "+msgNote, msg, unpack)
 	return err
 }
 
+/*
 func (n *node) writeMessageSlice(msg []byte) error {
 	return n.writer.WriteMessageSlice(msg)
 }
+func (n *node) readMessageSlice() ([]byte, error) {
+	return n.reader.ReadMessageSlice()
+}
+*/
 
-func (n *node) writeMessage(msg string) error {
-	msgByte :=  n.logger.PrepareSend("send string", msg)
+func (n *node) writeMessage(msg string, msgNote string) error {
+	msgByte := n.logger.PrepareSend("send string "+msgNote, msg)
 	err := n.writer.WriteMessageSlice(msgByte)
 	return err
 }
 
-func (n *node) readMessage() (string, error) {
+func (n *node) readMessage(msgNote string) (string, error) {
 	msg, err := n.reader.ReadMessageSlice()
 	var unpack string
-	n.logger.UnpackReceive("receive string", msg, &unpack)
+	n.logger.UnpackReceive("receive string "+msgNote, msg, &unpack)
 	return unpack, err
 }
 
-func (n *node) readMessageSlice() ([]byte, error) {
-	return n.reader.ReadMessageSlice()
+func (n *node) sendMessage(msg Message, msgNote string) error {
+	msgByte := n.logger.PrepareSend("send byte "+msgNote, msg)
+	err := n.writer.WriteMessageSlice(msgByte)
+	return err
 }
 
-func (n *node) sendMessage(msg Message) error {
-	return n.writeMessageSlice(msg.toJson())
-}
-
-func (n *node) receiveMessage() (Message, error) {
+func (n *node) receiveMessage(msgNote string) (Message, error) {
 	msgJson, err := n.readMessageSlice()
 	if err != nil {
 		return Message{}, err
 	}
-	return newMessageFromJson(msgJson)
+	msg := new(Message)
+	n.logger.UnpackReceive("receive byte "+msgNote, msgJson, &msg)
+	return *msg, err
 }
