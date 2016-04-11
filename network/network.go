@@ -12,7 +12,6 @@ package network
 import (
 	"errors"
 	"net"
-	//"fmt"
 	"github.com/arcaneiceman/GoVector/govec"
 )
 

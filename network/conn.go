@@ -4,6 +4,7 @@ import (
 	"../util"
 	"bufio"
 	"net"
+	"fmt"
 )
 
 // These are methods on node which acts like a connection wrapper
@@ -37,7 +38,8 @@ func (n *node) close() {
 }
 
 func (n *node) writeLog(buf interface{}, msgNote string) error {
-	msgByte := n.logger.PrepareSend("send byte "+msgNote, buf)
+	d := fmt.Sprintln(buf)
+	msgByte := n.logger.PrepareSend("send byte "+msgNote+d, buf)
 	err := n.writer.WriteMessageSlice(msgByte)
 	return err
 }
@@ -45,6 +47,8 @@ func (n *node) writeLog(buf interface{}, msgNote string) error {
 func (n *node) readLog(unpack interface{}, msgNote string) error {
 	msg, err := n.reader.ReadMessageSlice()
 	n.logger.UnpackReceive("receive byte "+msgNote, msg, unpack)
+//	d := fmt.Sprintln(unpack)
+//	n.logger.LogLocalEvent("last received byte content: "+ d)
 	return err
 }
 
@@ -58,7 +62,7 @@ func (n *node) readMessageSlice() ([]byte, error) {
 */
 
 func (n *node) writeMessage(msg string, msgNote string) error {
-	msgByte := n.logger.PrepareSend("send string "+msgNote, msg)
+	msgByte := n.logger.PrepareSend("send string "+msgNote+msg, msg)
 	err := n.writer.WriteMessageSlice(msgByte)
 	return err
 }
@@ -66,12 +70,14 @@ func (n *node) writeMessage(msg string, msgNote string) error {
 func (n *node) readMessage(msgNote string) (string, error) {
 	msg, err := n.reader.ReadMessageSlice()
 	var unpack string
-	n.logger.UnpackReceive("receive string "+msgNote, msg, &unpack)
+	d := fmt.Sprintln(msg)
+	n.logger.UnpackReceive("receive string "+msgNote+d, msg, &unpack)
 	return unpack, err
 }
 
 func (n *node) sendMessage(msg Message, msgNote string) error {
-	msgByte := n.logger.PrepareSend("send byte "+msgNote, msg)
+	d := fmt.Sprintln(msg)
+	msgByte := n.logger.PrepareSend("send byte "+msgNote+d, msg)
 	err := n.writer.WriteMessageSlice(msgByte)
 	return err
 }
@@ -84,5 +90,7 @@ func (n *node) receiveMessage(msgNote string) (Message, error, bool) {
 	}
 	msg := new(Message)
 	n.logger.UnpackReceive("receive byte "+msgNote, msgJson, &msg)
+	//d := fmt.Sprintln(msg)
+	//n.logger.LogLocalEvent("last received byte content: "+ d)
 	return *msg, err, true
 }
