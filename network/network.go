@@ -13,6 +13,7 @@ import (
 	"errors"
 	"github.com/arcaneiceman/GoVector/govec"
 	"net"
+	"os"
 	"strings"
 )
 
@@ -38,6 +39,7 @@ var (
 // NewNetworkManager initiate a new NetworkManager with listening
 // address addr to handle network operations
 func NewNetworkManager(localAddr, publicAddr string) (*NetworkManager, error) {
+	os.Mkdir("govecLogTxt", os.ModeDir)
 	manager := NetworkManager{
 		localAddr:  localAddr,
 		publicAddr: publicAddr,
