@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/nsf/termbox-go"
 	"github.com/satori/go.uuid"
+	"sort"
 	"strconv"
 )
 
@@ -96,9 +97,10 @@ func getPrompt() *buffer.Prompt {
 		str += "\n"
 		str += "Esc to switch between menu and editing the document\n"
 		str += "\nPeers In Network:\n"
-		netMeta := appState.Manager.GetNetworkMetadata()
-		for id, node := range netMeta {
-			str += id + ": Addr = " + node.Addr + ", Left = " + strconv.FormatBool(node.Left) + "\n"
+		netMeta := appState.Manager.GetNetworkMetadata().ToList()
+		sort.Sort(netMeta)
+		for _, node := range netMeta {
+			str += node.Id + ": Addr = " + node.Addr + ", Left = " + strconv.FormatBool(node.Left) + "\n"
 		}
 		str += "\n"
 		if appState.State == STATE_MENU_RETRY {

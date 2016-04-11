@@ -146,7 +146,7 @@ func (nm *NetworkManager) GetNetworkMetadataString() string {
 }
 
 func (nm *NetworkManager) GetNetworkMetadata() NetMeta {
-	return nm.nodePool.netMeta.copy()
+	return nm.nodePool.getLatestNetMetaCopy()
 }
 
 func (nm *NetworkManager) SetRemoteOpHandler(fn func([]byte)) {
