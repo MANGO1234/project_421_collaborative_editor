@@ -6,6 +6,7 @@ import (
 	"../treedoc2"
 	"../version"
 	"fmt"
+	"github.com/nsf/termbox-go"
 	"sync"
 )
 
@@ -108,7 +109,12 @@ func (model *DocumentModel) ApplyRemoteOperation(op RemoteOperation) {
 
 func (model *DocumentModel) AssertEqual() {
 	if model.Buffer.ToString() != treedoc2.DocToString(model.Treedoc) {
-		panic("Not equal document!\n**************************\n" + model.Buffer.ToString() + "\n*******************\n" + treedoc2.DocToString(model.Treedoc))
+		termbox.Close()
+		treedoc2.DebugDoc(model.Treedoc)
+		panic("Not equal document! (Could just be because translation between treedoc and buffer is wrong)\n" +
+			"************************** Local Text Buffer\n" + model.Buffer.ToString() +
+			"\n************************ TreeDoc\n" +
+			treedoc2.DocToString(model.Treedoc))
 	}
 }
 

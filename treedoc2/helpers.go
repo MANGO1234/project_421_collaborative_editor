@@ -80,6 +80,13 @@ func calcPosHelper(doc *Document, node *DocNode, n int) int {
 			acc += rootNode.Size
 		}
 		return acc
+	} else {
+		for _, parentNode := range node.Parent.Atoms[node.ParentN].Left {
+			if parentNode == node {
+				break
+			}
+			acc += parentNode.Size
+		}
+		return acc + calcPosHelper(doc, node.Parent, int(node.ParentN))
 	}
-	return acc + calcPosHelper(doc, node.Parent, int(node.ParentN))
 }
