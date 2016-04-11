@@ -78,14 +78,14 @@ func parseMessageHelper(msg Message) string {
 	switch msg.Type {
 	case MSG_TYPE_NET_META_UPDATE:
 		nm, _ := newNetMetaFromJson(msg.Msg)
-		msgPrint = msgPrint + fmt.Sprint(nm)
+		msgPrint = msgPrint + "Content: " + fmt.Sprint(nm)
 		break
 	case MSG_TYPE_VERSION_CHECK:
 		vcm, _ := newVersionCheckMsgContentFromJson(msg.Msg)
-		msgPrint = msgPrint + fmt.Sprint(vcm)
+		msgPrint = msgPrint + "Content: " + fmt.Sprint(vcm)
 		break
 	default: //remote op
-		msgPrint = msgPrint + fmt.Sprint(documentmanager.RemoteOperationsFromSlice(msg.Msg))
+		msgPrint = msgPrint + "Content: " + fmt.Sprint(documentmanager.RemoteOperationsFromSlice(msg.Msg))
 	}
 	return msgPrint
 }
