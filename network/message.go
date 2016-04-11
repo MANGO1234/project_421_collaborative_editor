@@ -3,10 +3,9 @@ package network
 import "encoding/json"
 
 const (
-	MSG_TYPE_VERSION_CHECK   = "versioncheck" // non-recursive
-	MSG_TYPE_NET_META_UPDATE = "netmeta"      // recursive broadcast
-	MSG_TYPE_REMOTE_OP       = "treedocOp"    // (non) recursive broadcast Indicate by the Visited field
-	MSG_TYPE_SYNC            = "sync"         // broadcast
+	MSG_TYPE_VERSION_CHECK   = "versionCheck"  // non-recursive
+	MSG_TYPE_NET_META_UPDATE = "netMetaUpdate" // recursive broadcast
+	MSG_TYPE_REMOTE_OP       = "remoteOp"      // (non) recursive broadcast Indicate by the Visited field
 )
 
 // TODO: for convenience, we are passing json around with possibly

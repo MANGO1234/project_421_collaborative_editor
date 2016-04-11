@@ -40,7 +40,7 @@ func (n *node) close() {
 
 func (n *node) writeLog(buf interface{}, msgNote string) error {
 	d := fmt.Sprint(buf)
-	msgByte := n.logger.PrepareSend("send byte "+msgNote+d, buf)
+	msgByte := n.logger.PrepareSend("send byte "+msgNote+" "+d, buf)
 	err := n.writer.WriteMessageSlice(msgByte)
 	return err
 }
@@ -61,7 +61,7 @@ func (n *node) readMessageSlice() ([]byte, error) {
 */
 
 func (n *node) writeMessage(msg string, msgNote string) error {
-	msgByte := n.logger.PrepareSend("send string "+msgNote+msg, msg)
+	msgByte := n.logger.PrepareSend("send string "+msgNote+" "+msg, msg)
 	err := n.writer.WriteMessageSlice(msgByte)
 	return err
 }
@@ -92,7 +92,7 @@ func parseMessageHelper(msg Message) string {
 
 func (n *node) sendMessage(msg Message, msgNote string) error {
 	msgPrint := parseMessageHelper(msg)
-	msgByte := n.logger.PrepareSend("send byte "+msgNote+msgPrint, msg)
+	msgByte := n.logger.PrepareSend("send byte "+msgNote+" "+msgPrint, msg)
 	err := n.writer.WriteMessageSlice(msgByte)
 	return err
 }
