@@ -17,7 +17,7 @@ type session struct {
 }
 
 func startNewSessionOnNetworkManager(nm *NetworkManager) error {
-	lAddr, err := net.ResolveTCPAddr("tcp", nm.addr)
+	lAddr, err := net.ResolveTCPAddr("tcp", nm.localAddr)
 	if err != nil {
 		return err
 	}

@@ -72,3 +72,35 @@ func (netMeta NetMeta) copy() NetMeta {
 	}
 	return newNetMeta
 }
+
+type NetMetaList []NodeMetaListElem
+
+type NodeMetaListElem struct {
+	Id   string
+	Addr string
+	Left bool
+}
+
+func (slice NetMetaList) Len() int {
+	return len(slice)
+}
+
+func (slice NetMetaList) Less(i, j int) bool {
+	return slice[i].Id < slice[j].Id
+}
+
+func (slice NetMetaList) Swap(i, j int) {
+	slice[i], slice[j] = slice[j], slice[i]
+}
+
+func (netMeta NetMeta) ToList() NetMetaList {
+	list := make(NetMetaList, 0, len(netMeta))
+	for id, node := range netMeta {
+		list = append(list, NodeMetaListElem{
+			Id:   id,
+			Addr: node.Addr,
+			Left: node.Left,
+		})
+	}
+	return list
+}

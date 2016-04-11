@@ -9,7 +9,9 @@ func redrawPrompt(prompt *buffer.Prompt, width, height int) {
 	cursorX, cursorY, lines := prompt.GetDisplayInformation(width-1, height)
 	termbox.Clear(termbox.ColorDefault, termbox.ColorDefault)
 	drawLines(lines, height)
-	termbox.SetCursor(cursorX, cursorY)
+	if cursorY < height {
+		termbox.SetCursor(cursorX, cursorY)
+	}
 	termbox.Flush()
 }
 

@@ -9,7 +9,7 @@ func (s *session) initiateNewNode(n *node) {
 	if n.state != nodeStateDisconnected {
 		return
 	}
-	if shouldConnect(s.manager.addr, n.addr) {
+	if shouldConnect(s.manager.publicAddr, n.addr) {
 		go s.connectThread(n)
 	} else {
 		go s.pokeThread(n)
@@ -67,7 +67,7 @@ func (s *session) poke(id, addr string) bool {
 		if err != nil {
 			return false
 		}
-		err = n.writeMessage(s.manager.addr, "poke, s.addr")
+		err = n.writeMessage(s.manager.publicAddr, "poke, s.addr")
 		if err != nil {
 			return false
 		}
@@ -128,7 +128,7 @@ func (s *session) connect(n *node) bool {
 		if err != nil {
 			return false
 		}
-		err = n.writeMessage(s.manager.addr, "connect s.addr")
+		err = n.writeMessage(s.manager.publicAddr, "connect s.addr")
 		if err != nil {
 			return false
 		}
@@ -162,7 +162,7 @@ func (s *session) receiveThread(n *node) {
 		if !connOk {
 			n.close()
 			n.setState(nodeStateDisconnected)
-			if shouldConnect(s.manager.addr, n.addr) {
+			if shouldConnect(s.manager.publicAddr, n.addr) {
 				go s.connectThread(n)
 			}
 			return
@@ -192,6 +192,6 @@ func (s *session) sendThread(sendWrapper *node) {
 			done = true
 		}
 	}
-	sendWrapper.sendMessage(newNetMetaUpdateMsg(s.id, newQuitNetMeta(s.id, s.manager.addr)), "sendThread newNetMetaUpdateMsg")
+	sendWrapper.sendMessage(newNetMetaUpdateMsg(s.id, newQuitNetMeta(s.id, s.manager.publicAddr)), "sendThread newNetMetaUpdateMsg")
 	sendWrapper.close()
 }

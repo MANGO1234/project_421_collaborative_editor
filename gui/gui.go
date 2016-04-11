@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"github.com/nsf/termbox-go"
 	"github.com/satori/go.uuid"
+	"sort"
 	"strconv"
 )
 
@@ -94,12 +95,14 @@ func getPrompt() *buffer.Prompt {
 			str += strconv.Itoa(i+1) + ". " + option + "\n"
 		}
 		str += "\n"
-		str += appState.Manager.GetNetworkMetadata()
-		str += "\n\n"
-		if appState.DocModel != nil {
-			str += "Esc to switch between menu and editing the document\n"
-			str += "\n"
+		str += "Esc to switch between menu and editing the document\n"
+		str += "\nPeers In Network:\n"
+		netMeta := appState.Manager.GetNetworkMetadata().ToList()
+		sort.Sort(netMeta)
+		for _, node := range netMeta {
+			str += node.Id + ": Addr = " + node.Addr + ", Left = " + strconv.FormatBool(node.Left) + "\n"
 		}
+		str += "\n"
 		if appState.State == STATE_MENU_RETRY {
 			str += "Input is not a valid input, please try again: "
 		} else {

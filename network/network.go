@@ -16,18 +16,17 @@ import (
 )
 
 type NetworkManager struct {
-	id             string
-	addr           string
-	msgChan        chan Message
-	nodePool       *nodePool
-	session        *session
-	TreeDocHandler func([]byte)
-	logger         *govec.GoLog
-
+	id         string
+	localAddr  string
+	publicAddr string
+	msgChan    chan Message
+	nodePool   *nodePool
+	session    *session
 	// this is ugly and nt really good, maybe changed later once its working
 	RemoteOpHandler      func([]byte)
 	GetOpsReceiveVersion func() []byte
 	VersionCheckHandler  func([]byte) ([]byte, bool)
+	logger               *govec.GoLog
 }
 
 var (
@@ -37,12 +36,13 @@ var (
 
 // NewNetworkManager initiate a new NetworkManager with listening
 // address addr to handle network operations
-func NewNetworkManager(addr string) (*NetworkManager, error) {
+func NewNetworkManager(localAddr, publicAddr string) (*NetworkManager, error) {
 	manager := NetworkManager{
-		addr:     addr,
-		msgChan:  make(chan Message, 30),
-		nodePool: newNodePool(),
-		logger:   govec.Initialize(addr, "govecLogTxt/"+addr),
+		localAddr:  localAddr,
+		publicAddr: publicAddr,
+		msgChan:    make(chan Message, 30),
+		nodePool:   newNodePool(),
+		logger:     govec.Initialize(localAddr, "govecLogTxt/"+localAddr),
 	}
 	err := startNewSessionOnNetworkManager(&manager)
 	if err != nil {
@@ -147,8 +147,12 @@ func (nm *NetworkManager) SendMessageToNodeWithId(msg Message, id string) {
 	nm.nodePool.sendMessageToNodeWithId(msg, id)
 }
 
-func (nm *NetworkManager) GetNetworkMetadata() string {
+func (nm *NetworkManager) GetNetworkMetadataString() string {
 	return string(nm.nodePool.getLatestNetMetaJsonPrettyPrint())
+}
+
+func (nm *NetworkManager) GetNetworkMetadata() NetMeta {
+	return nm.nodePool.getLatestNetMetaCopy()
 }
 
 func (nm *NetworkManager) SetRemoteOpHandler(fn func([]byte)) {
