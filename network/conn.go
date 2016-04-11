@@ -70,8 +70,7 @@ func (n *node) writeMessage(msg string, msgNote string) error {
 func (n *node) readMessage(msgNote string) (string, error) {
 	msg, err := n.reader.ReadMessageSlice()
 	var unpack string
-	d := fmt.Sprintln(msg)
-	n.logger.UnpackReceive("receive string "+msgNote+d, msg, &unpack)
+	n.logger.UnpackReceive("receive string "+msgNote, msg, &unpack)
 	return unpack, err
 }
 
