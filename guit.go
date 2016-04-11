@@ -8,12 +8,18 @@ import (
 )
 
 func main() {
-	if len(os.Args) != 2 {
-		fmt.Fprintf(os.Stderr, "Usage: %s [ip:port]\n", os.Args[0])
+	if len(os.Args) < 2 || len(os.Args) > 3 {
+		fmt.Fprintf(os.Stderr, "Usage: %s [local ip:port] [public ip:port]\n", os.Args[0])
 		os.Exit(1)
 	}
 
-	networkManager, err := network.NewNetworkManager(os.Args[1])
+	localAddr := os.Args[1]
+	publicAddr := os.Args[1]
+	if len(os.Args) == 3 {
+		publicAddr = os.Args[2]
+	}
+
+	networkManager, err := network.NewNetworkManager(localAddr, publicAddr)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%v", err)

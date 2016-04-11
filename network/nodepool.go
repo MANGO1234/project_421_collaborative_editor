@@ -125,7 +125,7 @@ func (np *nodePool) has(id string) bool {
 
 func (np *nodePool) handleNewSession(s *session) {
 	np.netMetaMutex.Lock()
-	np.netMeta[s.id] = NodeMeta{s.manager.addr, false}
+	np.netMeta[s.id] = NodeMeta{s.manager.publicAddr, false}
 	np.netMetaMutex.Unlock()
 	np.poolMutex.RLock()
 	for _, n := range np.pool {
@@ -141,7 +141,7 @@ func (np *nodePool) handleNewSession(s *session) {
 
 func (np *nodePool) handleEndSession(s *session) {
 	np.netMetaMutex.Lock()
-	np.netMeta[s.id] = NodeMeta{s.manager.addr, true}
+	np.netMeta[s.id] = NodeMeta{s.manager.publicAddr, true}
 	np.netMetaMutex.Unlock()
 	np.poolMutex.RLock()
 	for _, n := range np.pool {

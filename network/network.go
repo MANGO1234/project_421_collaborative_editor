@@ -15,11 +15,12 @@ import (
 )
 
 type NetworkManager struct {
-	id       string
-	addr     string
-	msgChan  chan Message
-	nodePool *nodePool
-	session  *session
+	id         string
+	localAddr  string
+	publicAddr string
+	msgChan    chan Message
+	nodePool   *nodePool
+	session    *session
 	// this is ugly and nt really good, maybe changed later once its working
 	RemoteOpHandler      func([]byte)
 	GetOpsReceiveVersion func() []byte
@@ -33,11 +34,12 @@ var (
 
 // NewNetworkManager initiate a new NetworkManager with listening
 // address addr to handle network operations
-func NewNetworkManager(addr string) (*NetworkManager, error) {
+func NewNetworkManager(localAddr, publicAddr string) (*NetworkManager, error) {
 	manager := NetworkManager{
-		addr:     addr,
-		msgChan:  make(chan Message, 30),
-		nodePool: newNodePool(),
+		localAddr:  localAddr,
+		publicAddr: publicAddr,
+		msgChan:    make(chan Message, 30),
+		nodePool:   newNodePool(),
 	}
 	err := startNewSessionOnNetworkManager(&manager)
 	if err != nil {
