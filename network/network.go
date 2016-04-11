@@ -11,8 +11,8 @@ package network
 
 import (
 	"errors"
-	"net"
 	"github.com/arcaneiceman/GoVector/govec"
+	"net"
 )
 
 type NetworkManager struct {
@@ -22,13 +22,12 @@ type NetworkManager struct {
 	nodePool       *nodePool
 	session        *session
 	TreeDocHandler func([]byte)
-	logger		   *govec.GoLog
+	logger         *govec.GoLog
 
 	// this is ugly and nt really good, maybe changed later once its working
 	RemoteOpHandler      func([]byte)
 	GetOpsReceiveVersion func() []byte
 	VersionCheckHandler  func([]byte) ([]byte, bool)
-
 }
 
 var (
@@ -43,7 +42,7 @@ func NewNetworkManager(addr string) (*NetworkManager, error) {
 		addr:     addr,
 		msgChan:  make(chan Message, 30),
 		nodePool: newNodePool(),
-		logger:	   govec.Initialize(addr, "govecLogTxt/"+addr), 
+		logger:   govec.Initialize(addr, "govecLogTxt/"+addr),
 	}
 	err := startNewSessionOnNetworkManager(&manager)
 	if err != nil {

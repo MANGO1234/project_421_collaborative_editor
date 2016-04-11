@@ -2,10 +2,10 @@ package network
 
 import (
 	"../util"
+	"github.com/arcaneiceman/GoVector/govec"
 	"net"
 	"sync"
 	"time"
-	"github.com/arcaneiceman/GoVector/govec"
 )
 
 // node state
@@ -30,7 +30,7 @@ type node struct {
 	reader     *util.MessageReader
 	writer     *util.MessageWriter
 	interval   time.Duration // current interval to reconnect
-	logger	   *govec.GoLog
+	logger     *govec.GoLog
 }
 
 func (n *node) setState(state NodeState) bool {
@@ -232,7 +232,6 @@ func (np *nodePool) applyReceivedUpdates(updates NetMeta) (nodeList []*node, del
 	return
 }
 
-
 func (np *nodePool) forceNodeQuit(n *node) {
 
 }
@@ -244,7 +243,6 @@ func (np *nodePool) getLatestNetMeta() NetMeta {
 	defer np.netMetaMutex.RUnlock()
 	return np.netMeta
 }
-
 
 func (np *nodePool) getLatestNetMetaJson() []byte {
 	np.netMetaMutex.RLock()
