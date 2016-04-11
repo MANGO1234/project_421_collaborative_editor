@@ -84,7 +84,7 @@ func main() {
 			// TODO: print current doc
 			//fmt.Println(treedoc.DocToString(mydoc))
 		case "printNetMeta":
-			fmt.Println(networkManager.GetNetworkMetadata())
+			fmt.Println(networkManager.GetNetworkMetadataString())
 		case "help":
 			// TODO: print a help menu
 		case "quit":

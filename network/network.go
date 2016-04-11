@@ -141,8 +141,12 @@ func (nm *NetworkManager) SendMessageToNodeWithId(msg Message, id string) {
 	nm.nodePool.sendMessageToNodeWithId(msg, id)
 }
 
-func (nm *NetworkManager) GetNetworkMetadata() string {
+func (nm *NetworkManager) GetNetworkMetadataString() string {
 	return string(nm.nodePool.getLatestNetMetaJsonPrettyPrint())
+}
+
+func (nm *NetworkManager) GetNetworkMetadata() NetMeta {
+	return nm.nodePool.netMeta.copy()
 }
 
 func (nm *NetworkManager) SetRemoteOpHandler(fn func([]byte)) {
