@@ -1,9 +1,13 @@
 package network
 
-import "net"
+import (
+	"fmt"
+	"net"
+)
 
 func (s *session) handleNewConn(conn net.Conn) {
 	n := newConnWrapper(conn)
+	fmt.Println("Hew")
 	// distinguish purpose of this connection
 	purpose, err := n.readMessage()
 	if err != nil {
@@ -23,6 +27,7 @@ func (s *session) handleNewConn(conn net.Conn) {
 }
 
 func (s *session) handleRegister(connWrapper *node) {
+	fmt.Println("REG HAN")
 	defer connWrapper.close()
 	latestNetMeta := s.manager.nodePool.getLatestNetMetaJson()
 	err := connWrapper.writeMessageSlice(latestNetMeta)
@@ -41,6 +46,7 @@ func (s *session) handleRegister(connWrapper *node) {
 }
 
 func (s *session) handlePoke(connWrapper *node) {
+	fmt.Println("POKE HAN")
 	defer connWrapper.close()
 	expectedId, err := connWrapper.readMessage()
 	if err != nil {
@@ -69,6 +75,7 @@ func (s *session) handlePoke(connWrapper *node) {
 }
 
 func (s *session) handleConnect(connWrapper *node) {
+	fmt.Println("CONN HAN")
 	expectedId, err := connWrapper.readMessage()
 	defer func(err error, connWrapper *node) {
 		if err != nil {
@@ -97,9 +104,9 @@ func (s *session) handleConnect(connWrapper *node) {
 	hasMsg, msg := s.getLatestVersionCheckMsg()
 	if hasMsg {
 		err = connWrapper.sendMessage(msg)
-	}
-	if err != nil {
-		return
+		if err != nil {
+			return
+		}
 	}
 	n := s.manager.nodePool.addOrGetNodeFromPool(id, NodeMeta{addr, false})
 	n.conn = connWrapper.conn

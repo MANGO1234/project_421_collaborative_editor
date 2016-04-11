@@ -1,6 +1,7 @@
 package network
 
 import (
+	"fmt"
 	"github.com/satori/go.uuid"
 	"net"
 	"time"
@@ -85,6 +86,7 @@ func (s *session) handleIncomingNetMeta(msg Message) {
 		s.handleNewNodes(newNodes)
 		msg.Msg = deltaNetMeta.toJson()
 		s.manager.nodePool.broadcast(msg)
+		fmt.Println("INM CHA")
 	}
 }
 
@@ -92,8 +94,10 @@ func (s *session) handleIncomingRemoteOp(msg Message) {
 	if s.manager.RemoteOpHandler != nil {
 		go s.manager.RemoteOpHandler(msg.Msg)
 	}
+	fmt.Println("IRO")
 	if msg.Visited != nil { // we should only recursively broadcast in this case
 		s.manager.nodePool.broadcast(msg)
+		fmt.Println("IRO BR")
 	}
 }
 
@@ -105,6 +109,7 @@ func (s *session) handleIncomingVersionCheck(msg Message) {
 	s.handleIncomingNetMeta(newNetMetaUpdateMsg(s.id, content.NetworkMeta))
 	syncInfo, shouldReply := s.manager.VersionCheckHandler(content.VersionVector)
 	if shouldReply {
+		fmt.Println("IVC RP")
 		toSend := NewReplyMessage(MSG_TYPE_REMOTE_OP, syncInfo)
 		go func() {
 			s.manager.nodePool.sendMessageToNodeWithId(toSend, content.Source)
