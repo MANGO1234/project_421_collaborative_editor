@@ -14,6 +14,7 @@ type session struct {
 	listener *net.TCPListener
 	manager  *NetworkManager
 	done     chan struct{}
+	nodePool *nodePool
 }
 
 func startNewSessionOnNetworkManager(nm *NetworkManager) error {
@@ -30,8 +31,9 @@ func startNewSessionOnNetworkManager(nm *NetworkManager) error {
 		listener: listener,
 		manager:  nm,
 		done:     make(chan struct{}),
+		nodePool: nm.nodePool,
 	}
-	nm.nodePool.handleNewSession(&newSession)
+	newSession.nodePool.handleNewSession(&newSession)
 	go newSession.listenForNewConn()
 	go newSession.periodicallyCheckVersion()
 	go newSession.serveIncomingMessages()
@@ -43,7 +45,7 @@ func startNewSessionOnNetworkManager(nm *NetworkManager) error {
 func (s *session) end() {
 	close(s.done)
 	s.listener.Close()
-	s.manager.nodePool.handleEndSession(s)
+	s.nodePool.handleEndSession(s)
 }
 
 func (s *session) ended() bool {
@@ -80,11 +82,11 @@ func (s *session) handleIncomingNetMeta(msg Message) {
 	if err != nil {
 		return
 	}
-	newNodes, deltaNetMeta, changed := s.manager.nodePool.applyReceivedUpdates(updates)
+	newNodes, deltaNetMeta, changed := s.nodePool.applyReceivedUpdates(updates)
 	if changed {
 		s.handleNewNodes(newNodes)
 		msg.Msg = deltaNetMeta.toJson()
-		s.manager.nodePool.broadcast(msg)
+		s.nodePool.broadcast(msg)
 	}
 }
 
@@ -93,7 +95,7 @@ func (s *session) handleIncomingRemoteOp(msg Message) {
 		go s.manager.RemoteOpHandler(msg.Msg)
 	}
 	if msg.Visited != nil { // we should only recursively broadcast in this case
-		s.manager.nodePool.broadcast(msg)
+		s.nodePool.broadcast(msg)
 	}
 }
 
@@ -107,7 +109,7 @@ func (s *session) handleIncomingVersionCheck(msg Message) {
 	if shouldReply {
 		toSend := NewReplyMessage(MSG_TYPE_REMOTE_OP, syncInfo)
 		go func() {
-			s.manager.nodePool.sendMessageToNodeWithId(toSend, content.Source)
+			s.nodePool.sendMessageToNodeWithId(toSend, content.Source)
 		}()
 	}
 }
@@ -141,7 +143,7 @@ func (s *session) periodicallyCheckVersion() {
 			return
 		}
 		if hasMsg {
-			s.manager.nodePool.broadcast(msg)
+			s.nodePool.broadcast(msg)
 		}
 	}
 }
@@ -149,7 +151,7 @@ func (s *session) periodicallyCheckVersion() {
 func (s *session) getLatestVersionCheckMsg() (bool, Message) {
 	slice := s.manager.GetOpsReceiveVersion()
 	if slice != nil {
-		latestMeta := s.manager.nodePool.getLatestNetMetaCopy()
+		latestMeta := s.nodePool.getLatestNetMetaCopy()
 		versionCheckMsgContent := VersionCheckMsgContent{
 			s.id,
 			latestMeta,

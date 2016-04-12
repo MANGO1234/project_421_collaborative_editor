@@ -121,6 +121,12 @@ func (nm *NetworkManager) Disconnect() error {
 	return nil
 }
 
+// Completely disconnect by throwing away all the NetMeta
+func (nm *NetworkManager) CompleteDisconnect() {
+	nm.Disconnect()
+	nm.nodePool = newNodePool(nm.logger)
+}
+
 // Reconnect rejoins the network with new UUID.
 func (nm *NetworkManager) Reconnect() error {
 	nm.logger.LogLocalEvent("begin reconnect========")
@@ -138,7 +144,7 @@ func (nm *NetworkManager) Broadcast(msg Message) {
 		return
 	}
 	nm.logger.LogLocalEvent("begin broadcast========")
-	nm.nodePool.broadcast(msg)
+	s.nodePool.broadcast(msg)
 }
 
 // Send msg to a node with specified id
@@ -148,7 +154,7 @@ func (nm *NetworkManager) SendMessageToNodeWithId(msg Message, id string) {
 	if s == nil || s.ended() {
 		return
 	}
-	nm.nodePool.sendMessageToNodeWithId(msg, id)
+	s.nodePool.sendMessageToNodeWithId(msg, id)
 }
 
 func (nm *NetworkManager) GetNetworkMetadataString() string {
