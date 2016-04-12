@@ -1,4 +1,4 @@
-package treedoc2
+package treedoc
 
 import . "../common"
 

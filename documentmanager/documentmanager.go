@@ -3,7 +3,7 @@ package documentmanager
 import (
 	"../buffer"
 	. "../common"
-	"../treedoc2"
+	"../treedoc"
 	"../version"
 	"fmt"
 	"github.com/nsf/termbox-go"
@@ -15,7 +15,7 @@ type DocumentModel struct {
 	OwnerId         SiteId
 	OpVersion       uint32
 	NodeIdClock     uint32
-	Treedoc         *treedoc2.Document
+	Treedoc         *treedoc.Document
 	Buffer          *buffer.Buffer
 	Log             *OperationLog
 	Queue           *OperationQueue
@@ -26,7 +26,7 @@ type DocumentModel struct {
 func NewDocumentModel(id SiteId, width int, updateGUI func(), broadcastRemote func(RemoteOperation)) *DocumentModel {
 	return &DocumentModel{
 		OwnerId:         id,
-		Treedoc:         treedoc2.NewDocument(),
+		Treedoc:         treedoc.NewDocument(),
 		Buffer:          buffer.StringToBuffer("", width),
 		Queue:           NewQueue(),
 		Log:             NewLog(),
@@ -40,9 +40,9 @@ func (model *DocumentModel) LocalInsert(atom byte) {
 	defer model.Unlock()
 	pos := model.Buffer.GetPosition()
 	model.Buffer.InsertAtCurrent(atom)
-	id := treedoc2.NewNodeId(model.OwnerId, model.NodeIdClock)
-	operation := treedoc2.InsertPos(model.Treedoc, id, pos, atom)
-	if operation.Type == treedoc2.INSERT_NEW || operation.Type == treedoc2.INSERT_ROOT {
+	id := treedoc.NewNodeId(model.OwnerId, model.NodeIdClock)
+	operation := treedoc.InsertPos(model.Treedoc, id, pos, atom)
+	if operation.Type == treedoc.INSERT_NEW || operation.Type == treedoc.INSERT_ROOT {
 		model.NodeIdClock++
 	}
 	model.OpVersion++
@@ -63,7 +63,7 @@ func (model *DocumentModel) LocalBackspace() {
 		return
 	}
 	model.Buffer.BackspaceAtCurrent()
-	operation := treedoc2.DeletePos(model.Treedoc, pos)
+	operation := treedoc.DeletePos(model.Treedoc, pos)
 	model.OpVersion++
 	vector := model.Log.Vector.Copy()
 	model.Log.Write(model.OwnerId, model.OpVersion, operation)
@@ -82,7 +82,7 @@ func (model *DocumentModel) LocalDelete() {
 		return
 	}
 	model.Buffer.DeleteAtCurrent()
-	operation := treedoc2.DeletePos(model.Treedoc, pos)
+	operation := treedoc.DeletePos(model.Treedoc, pos)
 	model.OpVersion++
 	vector := model.Log.Vector.Copy()
 	model.Log.Write(model.OwnerId, model.OpVersion, operation)
@@ -108,13 +108,13 @@ func (model *DocumentModel) ApplyRemoteOperation(op RemoteOperation) {
 }
 
 func (model *DocumentModel) AssertEqual() {
-	if model.Buffer.ToString() != treedoc2.DocToString(model.Treedoc) {
+	if model.Buffer.ToString() != treedoc.DocToString(model.Treedoc) {
 		termbox.Close()
-		treedoc2.DebugDoc(model.Treedoc)
+		treedoc.DebugDoc(model.Treedoc)
 		panic("Not equal document! (Could just be because translation between treedoc and buffer is wrong)\n" +
 			"************************** Local Text Buffer\n" + model.Buffer.ToString() +
 			"\n************************ TreeDoc\n" +
-			treedoc2.DocToString(model.Treedoc))
+			treedoc.DocToString(model.Treedoc))
 	}
 }
 

@@ -2,12 +2,12 @@ package documentmanager
 
 import (
 	. "../common"
-	"../treedoc2"
+	"../treedoc"
 	"../version"
 )
 
 type LogEntry struct {
-	Operation treedoc2.Operation
+	Operation treedoc.Operation
 	Id        SiteId
 	Version   uint32
 }
@@ -21,7 +21,7 @@ func NewLog() *OperationLog {
 	return &OperationLog{make([]LogEntry, 0, 100), version.NewVector()}
 }
 
-func (log *OperationLog) Write(id SiteId, version uint32, operation treedoc2.Operation) {
+func (log *OperationLog) Write(id SiteId, version uint32, operation treedoc.Operation) {
 	log.Vector.IncrementTo(id, version)
 	log.Log = append(log.Log, LogEntry{
 		Id:        id,
