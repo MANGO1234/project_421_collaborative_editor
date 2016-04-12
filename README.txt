@@ -8,7 +8,7 @@ GoVector: https://github.com/arcaneiceman/GoVector, use 'go get github.com/arcan
 Codec: https://github.com/hashicorp/go-msgpack, use 'go get github.com/hashicorp/go-msgpack/codec'
 
 Usage:
-go run guit.go <listening port> [public listening port]
+go run guit.go [listening port] [public listening port]
 
 Starts a colloborative editing peer that listens at listening port.
 The public listening port is optional. It specifies the address through which other nodes can connect to the current node.
