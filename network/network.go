@@ -125,6 +125,7 @@ func (nm *NetworkManager) Disconnect() error {
 func (nm *NetworkManager) CompleteDisconnect() {
 	nm.Disconnect()
 	nm.nodePool = newNodePool(nm.logger)
+	startNewSessionOnNetworkManager(nm)
 }
 
 // Reconnect rejoins the network with new UUID.
