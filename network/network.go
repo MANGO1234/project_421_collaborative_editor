@@ -89,7 +89,7 @@ func (nm *NetworkManager) ConnectTo(remoteAddr string) error {
 	defer conn.Close()
 	n := newConnWrapper(conn)
 	n.logger = nm.logger
-	err = n.writeLog(dialingTypeRegister, "ConnectTo dialingTypeRegister")
+	err = n.writeMessage(dialingTypeRegister, "ConnectTo dialingTypeRegister")
 	if err != nil {
 		return err
 	}
