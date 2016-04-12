@@ -5,11 +5,15 @@ The program requires the following libraries in the GOPATH
 Termbox: https://github.com/nsf/termbox-go, use 'go get -u github.com/nsf/termbox-go'
 UUID package for Go: https://github.com/satori/go.uuid, use 'go get github.com/satori/go.uuid'
 GoVector: https://github.com/arcaneiceman/GoVector, use 'go get github.com/arcaneiceman/GoVector'
+Codec: https://github.com/hashicorp/go-msgpack, use 'go get github.com/hashicorp/go-msgpack/codec'
 
 Usage:
-go run guit.go <listening port>
+go run guit.go <listening port> [public listening port]
 
 Starts a colloborative editing peer that listens at listening port.
+The public listening port is optional. It specifies the address through which other nodes can connect to the current node.
+This is helpful when the program is being run behind a NAT. If it's not provided, we assume other nodes can connect
+via the listening port. To test the program behind a NAT, ngrok can help to expose the local port. (See https://ngrok.com/)
 
 The program starts in the menu screen. Type 1 to start a new document. Press Esc to switch between the menu and editing the document.
 Esc and now there will be options to connect to other peers and receive their document and collaboratively edit with said peers.

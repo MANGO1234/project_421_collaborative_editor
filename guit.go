@@ -9,7 +9,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 || len(os.Args) > 3 {
-		fmt.Fprintf(os.Stderr, "Usage: %s [local ip:port] [public ip:port]\n", os.Args[0])
+		fmt.Fprintf(os.Stderr, "Usage: %s <listening port> [public listening port]\n", os.Args[0])
 		os.Exit(1)
 	}
 
