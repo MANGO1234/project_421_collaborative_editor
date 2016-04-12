@@ -8,7 +8,7 @@ GoVector: https://github.com/arcaneiceman/GoVector, use 'go get github.com/arcan
 Codec: https://github.com/hashicorp/go-msgpack, use 'go get github.com/hashicorp/go-msgpack/codec'
 
 Usage:
-go run guit.go [listening port] [public listening port]
+go run editor.go [listening port] [public listening port]
 
 Starts a colloborative editing peer that listens at listening port.
 The public listening port is optional. It specifies the address through which other nodes can connect to the current node.
@@ -21,9 +21,9 @@ There's an options to disconnect from the network and prevent any peers to conne
 Closing the document will disconnect you from the network completely and close the document. You will have to restart a new document and connect to the original network again.
 
 Example (on localhost)
-1. Run 'go run guit.go localhost:1000' in a command line prompt
+1. Run 'go run editor.go localhost:1000' in a command line prompt
 2. Enter 1 for New Document
-3. Run 'go run guit.go localhost:2000' in another command line prompt
+3. Run 'go run editor.go localhost:2000' in another command line prompt
 4. Enter 1 for New Document
 5. Press Esc
 6. Enter 1 for Connect
