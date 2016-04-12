@@ -47,9 +47,6 @@ func (s *session) end() {
 }
 
 func (s *session) ended() bool {
-	if s == nil {
-		return false
-	}
 	select {
 	case <-s.done:
 		return true
