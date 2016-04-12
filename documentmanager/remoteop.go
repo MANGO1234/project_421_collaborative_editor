@@ -1,7 +1,7 @@
 package documentmanager
 
 import "encoding/json"
-import "../treedoc2"
+import "../treedoc"
 import "../version"
 import (
 	. "../common"
@@ -12,14 +12,14 @@ type RemoteOperation struct {
 	Vector  version.VersionVector
 	Id      SiteId
 	Version uint32
-	Op      treedoc2.Operation
+	Op      treedoc.Operation
 }
 
 type RemoteOperationJson struct {
 	Vector  version.VersionVectorJson
 	Id      SiteId
 	Version uint32
-	Op      treedoc2.Operation
+	Op      treedoc.Operation
 }
 
 func RemoteOperationToSlice(op RemoteOperation) []byte {
