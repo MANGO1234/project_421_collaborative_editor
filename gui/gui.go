@@ -59,7 +59,7 @@ func doAction(input string) {
 			appState.ScreenY = 0
 			appState.State = STATE_DOCUMENT
 		} else if appState.MenuOptions[n-1] == OPTION_CLOSE_DOCUMENT {
-			appState.Manager.Disconnect()
+			appState.Manager.CompleteDisconnect()
 			appState.DocModel = nil
 		} else {
 			appState.State = STATE_MENU_RETRY

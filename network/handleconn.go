@@ -28,7 +28,7 @@ func (s *session) handleNewConn(conn net.Conn) {
 
 func (s *session) handleRegister(connWrapper *node) {
 	defer connWrapper.close()
-	latestNetMeta := s.manager.nodePool.getLatestNetMeta()
+	latestNetMeta := s.nodePool.getLatestNetMeta()
 	err := connWrapper.writeLog(latestNetMeta, "handleRegister lastestNetMeta")
 	if err != nil {
 		return
@@ -107,7 +107,7 @@ func (s *session) handleConnect(connWrapper *node) {
 	if err != nil {
 		return
 	}
-	n := s.manager.nodePool.addOrGetNodeFromPool(id, NodeMeta{addr, false}, s.manager.logger)
+	n := s.nodePool.addOrGetNodeFromPool(id, NodeMeta{addr, false}, s.manager.logger)
 	n.conn = connWrapper.conn
 	n.reader = connWrapper.reader
 	n.writer = connWrapper.writer
